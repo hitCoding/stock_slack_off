@@ -310,7 +310,7 @@
 <body>
     <div class="floating-container">
         <div class="drag-handle"></div>
-       <!-- <button class="close-btn" id="closeBtn" title="关闭悬浮窗">×</button>
+        <!-- <button class="close-btn" id="closeBtn" title="关闭悬浮窗">×</button>
         <button class="minimize-btn" id="minimizeBtn" title="最小化">_</button>-->
         <div class="resize-handle" id="resizeHandle" title="拖拽调整大小"></div>
 
@@ -339,7 +339,7 @@
 
             if (stockCode) stockCode.textContent = data.code;
             if (stockName) stockName.textContent = data.name;
-            if (stockPrice) stockPrice.textContent = `${data.currentPrice}`;
+            if (stockPrice) stockPrice.textContent = `¥${data.currentPrice}`;
 
             if (stockChange) {
                 const isPositive = parseFloat(data.change) >= 0;
@@ -361,22 +361,42 @@
             }, 1000);
         }
 
-        // 关闭按钮事件
-        document.getElementById('closeBtn').addEventListener('click', () => {
-            window.close();
-        });
+        // 关闭按钮事件（如果按钮存在）
+        const closeBtn = document.getElementById('closeBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                try {
+                    window.close();
+                } catch (error) {
+                    console.error('关闭悬浮窗口失败:', error);
+                }
+            });
+        }
 
-        // 最小化按钮事件
-        document.getElementById('minimizeBtn').addEventListener('click', () => {
-            // 通知主进程隐藏悬浮窗口
-            window.electronAPI.invoke('hide-floating-window');
-        });
+        // 最小化按钮事件（如果按钮存在）
+        const minimizeBtn = document.getElementById('minimizeBtn');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                try {
+                    // 通知主进程隐藏悬浮窗口
+                    if (window.electronAPI && window.electronAPI.invoke) {
+                        window.electronAPI.invoke('hide-floating-window');
+                    }
+                } catch (error) {
+                    console.error('最小化悬浮窗口失败:', error);
+                }
+            });
+        }
 
         // 双击悬浮窗显示主窗口
         document.addEventListener('dblclick', (e) => {
-            // 避免双击按钮时触发
-            if (e.target.tagName !== 'BUTTON') {
-                window.electronAPI.invoke('show-main-window');
+            try {
+                // 避免双击按钮时触发
+                if (e.target.tagName !== 'BUTTON' && window.electronAPI && window.electronAPI.invoke) {
+                    window.electronAPI.invoke('show-main-window');
+                }
+            } catch (error) {
+                console.error('双击显示主窗口失败:', error);
             }
         });
 
@@ -390,14 +410,21 @@
         let isResizing = false;
         let startX, startY, startWidth, startHeight;
 
-        document.getElementById('resizeHandle').addEventListener('mousedown', (e) => {
-            isResizing = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            startWidth = window.outerWidth;
-            startHeight = window.outerHeight;
-            e.preventDefault();
-        });
+        const resizeHandle = document.getElementById('resizeHandle');
+        if (resizeHandle) {
+            resizeHandle.addEventListener('mousedown', (e) => {
+                try {
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = window.outerWidth;
+                    startHeight = window.outerHeight;
+                    e.preventDefault();
+                } catch (error) {
+                    console.error('开始调整大小失败:', error);
+                }
+            });
+        }
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
@@ -419,12 +446,19 @@
         let isDragging = false;
         let dragStartX, dragStartY;
 
-        document.querySelector('.drag-handle').addEventListener('mousedown', (e) => {
-            isDragging = true;
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-            e.preventDefault();
-        });
+        const dragHandle = document.querySelector('.drag-handle');
+        if (dragHandle) {
+            dragHandle.addEventListener('mousedown', (e) => {
+                try {
+                    isDragging = true;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                    e.preventDefault();
+                } catch (error) {
+                    console.error('开始拖拽失败:', error);
+                }
+            });
+        }
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;

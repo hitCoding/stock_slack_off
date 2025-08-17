@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
 
 let mainWindow;
 let floatingWindow; // 悬浮窗口
@@ -9,8 +10,43 @@ let tray;
 let stockData = new Map();
 let stockCodes = ['000001', '600000', '000858']; // 默认股票代码
 let currentStockIndex = 0; // 当前显示的股票索引
+
+// 股票代码配置文件路径
+const STOCK_CODES_FILE = path.join(__dirname, 'stock-codes.json');
 let stockDisplayTimer = null; // 股票显示轮播定时器
 let dataRefreshTimer = null; // 数据刷新定时器
+
+// 读取股票代码配置文件
+function loadStockCodes() {
+    try {
+        if (fs.existsSync(STOCK_CODES_FILE)) {
+            const data = fs.readFileSync(STOCK_CODES_FILE, 'utf8');
+            const config = JSON.parse(data);
+            stockCodes = config.stockCodes || ['000001', '600000', '000858'];
+            console.log('✅ 已从配置文件加载股票代码:', stockCodes);
+        } else {
+            console.log('📝 配置文件不存在，使用默认股票代码');
+            saveStockCodes(); // 创建默认配置文件
+        }
+    } catch (error) {
+        console.error('❌ 读取股票代码配置文件失败:', error);
+        console.log('🔄 使用默认股票代码');
+    }
+}
+
+// 保存股票代码到配置文件
+function saveStockCodes() {
+    try {
+        const config = {
+            stockCodes: stockCodes,
+            lastUpdated: new Date().toISOString()
+        };
+        fs.writeFileSync(STOCK_CODES_FILE, JSON.stringify(config, null, 2), 'utf8');
+        console.log('✅ 股票代码已保存到配置文件:', stockCodes);
+    } catch (error) {
+        console.error('❌ 保存股票代码配置文件失败:', error);
+    }
+}
 
 // 创建主窗口
 function createWindow() {
@@ -28,7 +64,7 @@ function createWindow() {
             allowRunningInsecureContent: false
         },
         icon: path.join(__dirname, 'assets/icon.png'),
-        show: false, // 窗口隐藏，只显示托盘
+        show: true, // 窗口显示
         resizable: false,
         minimizable: true, // 允许最小化
         maximizable: false,
@@ -44,14 +80,22 @@ function createWindow() {
 
     // 监听窗口最小化事件
     mainWindow.on('minimize', () => {
-        console.log('主窗口已最小化，显示悬浮窗口');
-        showFloatingWindow();
+        try {
+            console.log('主窗口已最小化，显示悬浮窗口');
+            showFloatingWindow();
+        } catch (error) {
+            console.error('处理窗口最小化事件失败:', error);
+        }
     });
 
     // 监听窗口恢复事件
     mainWindow.on('restore', () => {
-        console.log('主窗口已恢复，隐藏悬浮窗口');
-        hideFloatingWindow();
+        try {
+            console.log('主窗口已恢复，隐藏悬浮窗口');
+            hideFloatingWindow();
+        } catch (error) {
+            console.error('处理窗口恢复事件失败:', error);
+        }
     });
 
     // 开发模式下显示开发者工具
@@ -126,61 +170,76 @@ function createFloatingWindow() {
 
     // 监听窗口大小变化
     floatingWindow.on('resize', () => {
-        const [newWidth, newHeight] = floatingWindow.getSize();
-        console.log(`悬浮窗口大小已调整: ${newWidth}x${newHeight}`);
-
-        // 保存新的尺寸到本地存储（可选）
-        // 这里可以添加保存用户偏好尺寸的逻辑
+        try {
+            if (floatingWindow && !floatingWindow.isDestroyed()) {
+                const [newWidth, newHeight] = floatingWindow.getSize();
+                console.log(`悬浮窗口大小已调整: ${newWidth}x${newHeight}`);
+            }
+        } catch (error) {
+            console.error('处理悬浮窗口大小变化事件失败:', error);
+        }
     });
 
     // 监听窗口位置变化
     floatingWindow.on('moved', () => {
-        const [newX, newY] = floatingWindow.getPosition();
-        console.log(`悬浮窗口位置已调整: ${newX}, ${newY}`);
-
-        // 保存新的位置到本地存储（可选）
-        // 这里可以添加保存用户偏好位置的逻辑
+        try {
+            if (floatingWindow && !floatingWindow.isDestroyed()) {
+                const [newX, newY] = floatingWindow.getPosition();
+                console.log(`悬浮窗口位置已调整: ${newX}, ${newY}`);
+            }
+        } catch (error) {
+            console.error('处理悬浮窗口位置变化事件失败:', error);
+        }
     });
 
     // 确保窗口始终置顶
     floatingWindow.on('show', () => {
-        floatingWindow.setAlwaysOnTop(true, 'screen-saver');
-        floatingWindow.setSize(150, 30);
-        floatingWindow.setAlwaysOnTop(true, 'floating');
+        try {
+            if (floatingWindow && !floatingWindow.isDestroyed()) {
+                floatingWindow.setAlwaysOnTop(true, 'screen-saver');
+                floatingWindow.setSize(150, 30);
+                floatingWindow.setAlwaysOnTop(true, 'floating');
+            }
+        } catch (error) {
+            console.error('设置悬浮窗口置顶失败:', error);
+        }
     });
 
-    // 监听窗口大小变化
-    floatingWindow.on('resize', () => {
-        const [newWidth, newHeight] = floatingWindow.getSize();
-        console.log(`悬浮窗口大小已调整: ${newWidth}x${newHeight}`);
 
-        // 保存新的尺寸到本地存储（可选）
-        // 这里可以添加保存用户偏好尺寸的逻辑
-    });
-
-    // 监听窗口位置变化
-    floatingWindow.on('moved', () => {
-        const [newX, newY] = floatingWindow.getPosition();
-        console.log(`悬浮窗口位置已调整: ${newX}, ${newY}`);
-
-        // 保存新的位置到本地存储（可选）
-        // 这里可以添加保存用户偏好位置的逻辑
-    });
-
-    // 确保窗口始终置顶
-    floatingWindow.on('show', () => {
-        floatingWindow.setAlwaysOnTop(true, 'screen-saver');
-        floatingWindow.setAlwaysOnTop(true, 'floating');
-    });
 
     console.log('悬浮窗口已创建');
 }
 
 // 显示悬浮窗口
 function showFloatingWindow() {
-    if (floatingWindow && !floatingWindow.isDestroyed()) {
-        floatingWindow.show();
-        console.log('悬浮窗口已显示');
+    try {
+        if (floatingWindow && !floatingWindow.isDestroyed()) {
+            floatingWindow.show();
+            floatingWindow.setAlwaysOnTop(true, 'screen-saver');
+            floatingWindow.setAlwaysOnTop(true, 'floating');
+            console.log('✅ 悬浮窗口已显示');
+        } else {
+            console.warn('⚠️ 悬浮窗口不存在或已销毁，重新创建');
+            createFloatingWindow();
+            if (floatingWindow && !floatingWindow.isDestroyed()) {
+                floatingWindow.show();
+                floatingWindow.setAlwaysOnTop(true, 'screen-saver');
+                floatingWindow.setAlwaysOnTop(true, 'floating');
+                console.log('✅ 悬浮窗口已重新创建并显示');
+            }
+        }
+    } catch (error) {
+        console.error('❌ 显示悬浮窗口失败:', error);
+        // 尝试重新创建悬浮窗口
+        try {
+            createFloatingWindow();
+            if (floatingWindow && !floatingWindow.isDestroyed()) {
+                floatingWindow.show();
+                console.log('✅ 悬浮窗口已重新创建并显示');
+            }
+        } catch (recreateError) {
+            console.error('❌ 重新创建悬浮窗口也失败:', recreateError);
+        }
     }
 }
 
@@ -209,14 +268,14 @@ function updateFloatingDisplay() {
             floatingWindow.webContents.send('update-stock-display', {
                 code: currentStock.code.slice(-3),
                 name: currentStock.name,
-                currentPrice: currentStock.currentPrice,
+                currentPrice: currentStock.price,
                 change: currentStock.change,
                 changePercent: currentStock.changePercent,
                 changeSymbol: changeSymbol,
                 changeColor: changeColor
             });
 
-            console.log(`悬浮窗口显示: ${currentStock.code} ${currentStock.currentPrice} ${changeSymbol}${currentStock.change}`);
+            console.log(`悬浮窗口显示: ${currentStock.code} ${currentStock.price} ${changeSymbol}${currentStock.change}`);
         }
 
         // 移动到下一个股票
@@ -278,30 +337,85 @@ function createTray() {
             {
                 label: '显示窗口',
                 click: () => {
-                    mainWindow.show();
-                    mainWindow.focus();
-                    hideFloatingWindow();
+                    try {
+                        if (mainWindow && !mainWindow.isDestroyed()) {
+                            mainWindow.show();
+                            mainWindow.focus();
+                            mainWindow.restore(); // 确保窗口从最小化状态恢复
+                            hideFloatingWindow();
+                        } else {
+                            console.warn('⚠️ 主窗口不存在或已销毁，重新创建');
+                            createWindow();
+                            if (mainWindow && !mainWindow.isDestroyed()) {
+                                mainWindow.show();
+                                mainWindow.focus();
+                                mainWindow.restore();
+                                hideFloatingWindow();
+                                console.log('✅ 主窗口已重新创建并显示');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('显示主窗口失败:', error);
+                        // 尝试重新创建主窗口
+                        try {
+                            createWindow();
+                            if (mainWindow && !mainWindow.isDestroyed()) {
+                                mainWindow.show();
+                                mainWindow.focus();
+                                console.log('✅ 主窗口已重新创建并显示');
+                            }
+                        } catch (recreateError) {
+                            console.error('❌ 重新创建主窗口也失败:', recreateError);
+                        }
+                    }
                 }
             },
             {
                 label: '隐藏窗口',
                 click: () => {
-                    mainWindow.hide();
-                    showFloatingWindow();
+                    try {
+                        if (mainWindow && !mainWindow.isDestroyed()) {
+                            mainWindow.hide();
+                            showFloatingWindow();
+                        }
+                    } catch (error) {
+                        console.error('隐藏主窗口失败:', error);
+                    }
                 }
             },
             { type: 'separator' },
             {
                 label: '刷新东方财富数据',
                 click: () => {
-                    fetchRealStockData();
+                    try {
+                        fetchRealStockData();
+                    } catch (error) {
+                        console.error('刷新数据失败:', error);
+                    }
+                }
+            },
+            { type: 'separator' },
+            {
+                label: '恢复窗口',
+                click: () => {
+                    try {
+                        console.log('🔄 手动触发窗口恢复');
+                        checkAndRestoreWindows();
+                    } catch (error) {
+                        console.error('手动恢复窗口失败:', error);
+                    }
                 }
             },
             { type: 'separator' },
             {
                 label: '退出',
                 click: () => {
-                    app.quit();
+                    try {
+                        app.quit();
+                    } catch (error) {
+                        console.error('退出应用失败:', error);
+                        process.exit(0);
+                    }
                 }
             }
         ]);
@@ -311,13 +425,39 @@ function createTray() {
 
         // 托盘点击事件
         tray.on('click', () => {
-            if (mainWindow.isVisible()) {
-                mainWindow.hide();
-                showFloatingWindow();
-            } else {
-                mainWindow.show();
-                mainWindow.focus();
-                hideFloatingWindow();
+            try {
+                if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+                    mainWindow.hide();
+                    showFloatingWindow();
+                } else if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                    mainWindow.restore(); // 确保窗口从最小化状态恢复
+                    hideFloatingWindow();
+                } else {
+                    console.warn('⚠️ 主窗口不存在或已销毁，重新创建');
+                    createWindow();
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.show();
+                        mainWindow.focus();
+                        mainWindow.restore();
+                        hideFloatingWindow();
+                        console.log('✅ 主窗口已重新创建并显示');
+                    }
+                }
+            } catch (error) {
+                console.error('托盘点击事件处理失败:', error);
+                // 尝试重新创建主窗口
+                try {
+                    createWindow();
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.show();
+                        mainWindow.focus();
+                        console.log('✅ 主窗口已重新创建并显示');
+                    }
+                } catch (recreateError) {
+                    console.error('❌ 重新创建主窗口也失败:', recreateError);
+                }
             }
         });
 
@@ -443,13 +583,9 @@ function parseEastMoneyStockData(rawData) {
                     const stock = {
                         code: code,
                         name: name,
-                        currentPrice: currentPrice.toFixed(2),
-                        previousPrice: previousPrice.toFixed(2),
-                        openPrice: openPrice.toFixed(2),
-                        highPrice: highPrice.toFixed(2),
-                        lowPrice: lowPrice.toFixed(2),
-                        change: finalPriceChange.toFixed(2),
-                        changePercent: finalChangePercent.toFixed(2),
+                        price: parseFloat(currentPrice.toFixed(2)),
+                        change: parseFloat(finalPriceChange.toFixed(2)),
+                        changePercent: parseFloat(finalChangePercent.toFixed(2)),
                         volume: volume,
                         amount: amount,
                         timestamp: new Date()
@@ -494,10 +630,9 @@ function generateMockStockData() {
         return {
             code: code,
             name: stockNames[code] || `股票${code}`,
-            currentPrice: currentPrice.toFixed(2),
-            previousPrice: previousPrice.toFixed(2),
-            change: priceChange.toFixed(2),
-            changePercent: changePercent.toFixed(2),
+            price: parseFloat(currentPrice.toFixed(2)),
+            change: parseFloat(priceChange.toFixed(2)),
+            changePercent: parseFloat(changePercent.toFixed(2)),
             volume: Math.floor(Math.random() * 1000000) + 100000,
             timestamp: new Date()
         };
@@ -512,7 +647,12 @@ function generateMockStockData() {
     // 立即更新托盘显示
     updateTrayDisplay();
 
-    console.log('模拟股票数据已生成');
+    // 通知渲染进程更新数据
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('stock-data-updated', Array.from(stockData.values()));
+    }
+
+    console.log('模拟股票数据已生成，已通知渲染进程');
 }
 
 // 更新托盘显示
@@ -529,12 +669,12 @@ function updateTrayDisplay() {
             const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
 
             // 托盘提示文本
-            const tooltipText = `${changeColor} ${currentStock.code} ${currentStock.name}\n¥${currentStock.currentPrice} ${changeSymbol}${currentStock.change} (${currentStock.changePercent}%)`;
+            const tooltipText = `${changeColor} ${currentStock.code} ${currentStock.name}\n¥${currentStock.price} ${changeSymbol}${currentStock.change} (${currentStock.changePercent}%)`;
 
             // 更新托盘提示
             tray.setToolTip(tooltipText);
 
-            console.log(`托盘显示: ${currentStock.code} ${currentStock.currentPrice} ${changeSymbol}${currentStock.change}`);
+            console.log(`托盘显示: ${currentStock.code} ${currentStock.price} ${changeSymbol}${currentStock.change}`);
         }
 
         // 移动到下一个股票
@@ -601,8 +741,8 @@ function setupIpcHandlers() {
     ipcMain.handle('get-settings', async () => {
         return {
             stockCodes: stockCodes,
-            refreshInterval: 30000,
-            rotationInterval: 3000
+            refreshInterval: 30000, // 30秒
+            rotationInterval: 5000  // 5秒
         };
     });
 
@@ -611,6 +751,8 @@ function setupIpcHandlers() {
         if (settings.stockCodes) {
             stockCodes = settings.stockCodes;
             console.log('股票代码已更新:', stockCodes);
+            // 保存到配置文件
+            saveStockCodes();
             // 更新设置后立即获取新数据
             fetchRealStockData();
         }
@@ -636,19 +778,49 @@ function setupIpcHandlers() {
 
     // 处理显示主窗口请求
     ipcMain.handle('show-main-window', async () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.show();
-            mainWindow.focus();
-            hideFloatingWindow();
+        try {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.show();
+                mainWindow.focus();
+                mainWindow.restore(); // 确保窗口从最小化状态恢复
+                hideFloatingWindow();
+            } else {
+                console.warn('⚠️ 主窗口不存在或已销毁，重新创建');
+                createWindow();
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                    mainWindow.restore();
+                    hideFloatingWindow();
+                    console.log('✅ 主窗口已重新创建并显示');
+                }
+            }
+        } catch (error) {
+            console.error('显示主窗口失败:', error);
+            // 尝试重新创建主窗口
+            try {
+                createWindow();
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                    console.log('✅ 主窗口已重新创建并显示');
+                }
+            } catch (recreateError) {
+                console.error('❌ 重新创建主窗口也失败:', recreateError);
+            }
         }
         return { success: true };
     });
 
     // 处理隐藏主窗口请求
     ipcMain.handle('hide-main-window', async () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.hide();
-            showFloatingWindow();
+        try {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.hide();
+                showFloatingWindow();
+            }
+        } catch (error) {
+            console.error('隐藏主窗口失败:', error);
         }
         return { success: true };
     });
@@ -656,9 +828,48 @@ function setupIpcHandlers() {
     console.log('IPC处理程序已设置');
 }
 
+// 检查并恢复窗口状态
+function checkAndRestoreWindows() {
+    try {
+        // 检查主窗口
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            console.warn('⚠️ 主窗口不存在或已销毁，重新创建');
+            createWindow();
+        } else if (!mainWindow.isVisible() && !mainWindow.isMinimized()) {
+            console.warn('⚠️ 主窗口不可见且未最小化，尝试恢复');
+            mainWindow.show();
+            mainWindow.focus();
+        }
+
+        // 检查悬浮窗口
+        if (!floatingWindow || floatingWindow.isDestroyed()) {
+            console.warn('⚠️ 悬浮窗口不存在或已销毁，重新创建');
+            createFloatingWindow();
+        }
+    } catch (error) {
+        console.error('❌ 检查并恢复窗口状态失败:', error);
+    }
+}
+
+// 全局错误处理
+process.on('uncaughtException', (error) => {
+    console.error('未捕获的异常:', error);
+    // 尝试恢复窗口状态
+    setTimeout(checkAndRestoreWindows, 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('未处理的Promise拒绝:', reason);
+    // 尝试恢复窗口状态
+    setTimeout(checkAndRestoreWindows, 1000);
+});
+
 // 应用事件处理
 app.whenReady().then(() => {
     console.log('应用已准备就绪，开始初始化...');
+
+    // 首先加载股票代码配置
+    loadStockCodes();
 
     createWindow();
     createFloatingWindow(); // 创建悬浮窗口
@@ -675,6 +886,9 @@ app.whenReady().then(() => {
 
     // 启动股票轮播显示
     startStockRotation();
+
+    // 定期检查窗口状态（每30秒检查一次）
+    setInterval(checkAndRestoreWindows, 30000);
 
     // 在macOS上，当所有窗口都关闭时，重新创建一个窗口
     app.on('activate', () => {

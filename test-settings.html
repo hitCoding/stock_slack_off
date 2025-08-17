@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置面板测试</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .test-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+
+        .test-button:hover {
+            background: #5a6fd8;
+        }
+
+        .settings-panel {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .settings-panel.hidden {
+            display: none;
+        }
+
+        .setting-group {
+            margin-bottom: 16px;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .setting-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .stock-codes-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            background: white;
+            min-height: 100px;
+        }
+
+        .stock-code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 4px 0;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+
+        .btn-add {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-add:hover {
+            background: #218838;
+        }
+
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="test-container">
+        <div class="header">
+            <h1>设置面板功能测试</h1>
+            <p>测试股票代码管理功能</p>
+        </div>
+
+        <div class="content">
+            <div class="status" id="status">
+                状态: 准备就绪
+            </div>
+
+            <button class="test-button" onclick="toggleSettings()">
+                点击测试设置面板
+            </button>
+
+            <button class="test-button" onclick="testAddStock()">
+                测试添加股票代码
+            </button>
+
+            <button class="test-button" onclick="testEditStock()">
+                测试编辑股票代码
+            </button>
+
+            <div id="settings-panel" class="settings-panel hidden">
+                <h3>设置面板</h3>
+
+                <div class="setting-group">
+                    <label>股票代码管理:</label>
+                    <div class="stock-codes-list" id="stock-codes-list">
+                        <div class="stock-code-item">
+                            <span>000001 - 平安银行</span>
+                            <div>
+                                <button onclick="editStock(this)">编辑</button>
+                                <button onclick="deleteStock(this)">删除</button>
+                            </div>
+                        </div>
+                        <div class="stock-code-item">
+                            <span>600000 - 浦发银行</span>
+                            <div>
+                                <button onclick="editStock(this)">编辑</button>
+                                <button onclick="deleteStock(this)">删除</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="text" id="new-stock-code" placeholder="输入股票代码 (如: 000001)" maxlength="6"
+                            style="flex: 1;">
+                        <button class="btn-add" onclick="addStock()">添加</button>
+                    </div>
+
+                    <small style="color: #666; margin-top: 5px; display: block;">
+                        支持格式: 000001(深市), 600000(沪市), 300001(创业板)
+                    </small>
+                </div>
+
+                <div class="setting-group">
+                    <label for="refresh-interval">数据刷新间隔 (秒):</label>
+                    <input type="number" id="refresh-interval" min="5" max="300" value="30">
+                </div>
+
+                <div class="setting-group">
+                    <label for="rotation-interval">任务栏轮播间隔 (秒):</label>
+                    <input type="number" id="rotation-interval" min="2" max="60" value="5">
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="test-button" onclick="saveSettings()" style="flex: 1;">保存设置</button>
+                    <button class="test-button" onclick="toggleSettings()"
+                        style="flex: 1; background: #6c757d;">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stockCodes = ['000001', '600000', '000858'];
+
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            const status = document.getElementById('status');
+
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                status.textContent = '状态: 设置面板已显示';
+                status.style.background = '#d4edda';
+                status.style.borderColor = '#c3e6cb';
+            } else {
+                panel.classList.add('hidden');
+                status.textContent = '状态: 设置面板已隐藏';
+                status.style.background = '#e7f3ff';
+                status.style.borderColor = '#b3d9ff';
+            }
+        }
+
+        function addStock() {
+            const input = document.getElementById('new-stock-code');
+            const code = input.value.trim();
+
+            if (!code) {
+                alert('请输入股票代码');
+                return;
+            }
+
+            if (!/^(0|3|6)\d{5}$/.test(code)) {
+                alert('股票代码格式不正确');
+                return;
+            }
+
+            if (stockCodes.includes(code)) {
+                alert('股票代码已存在');
+                return;
+            }
+
+            stockCodes.push(code);
+            updateStockList();
+            input.value = '';
+
+            const status = document.getElementById('status');
+            status.textContent = `状态: 已添加股票代码 ${code}`;
+            status.style.background = '#d4edda';
+            status.style.borderColor = '#c3e6cb';
+        }
+
+        function editStock(button) {
+            const item = button.closest('.stock-code-item');
+            const span = item.querySelector('span');
+            const originalText = span.textContent;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = originalText.split(' - ')[0];
+            input.style.width = '80px';
+            input.style.marginRight = '10px';
+
+            span.innerHTML = '';
+            span.appendChild(input);
+            input.focus();
+            input.select();
+
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '保存';
+            saveBtn.onclick = () => saveEdit(item, input, originalText);
+            saveBtn.style.marginRight = '5px';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.onclick = () => cancelEdit(item, originalText);
+
+            button.parentNode.innerHTML = '';
+            button.parentNode.appendChild(saveBtn);
+            button.parentNode.appendChild(cancelBtn);
+        }
+
+        function saveEdit(item, input, originalText) {
+            const newCode = input.value.trim();
+            if (!/^(0|3|6)\d{5}$/.test(newCode)) {
+                alert('股票代码格式不正确');
+                return;
+            }
+
+            const oldCode = originalText.split(' - ')[0];
+            const index = stockCodes.indexOf(oldCode);
+            if (index !== -1) {
+                stockCodes[index] = newCode;
+            }
+
+            updateStockList();
+
+            const status = document.getElementById('status');
+            status.textContent = `状态: 股票代码已更新 ${oldCode} → ${newCode}`;
+            status.style.background = '#d4edda';
+            status.style.borderColor = '#c3e6cb';
+        }
+
+        function cancelEdit(item, originalText) {
+            updateStockList();
+        }
+
+        function deleteStock(button) {
+            const item = button.closest('.stock-code-item');
+            const code = item.querySelector('span').textContent.split(' - ')[0];
+
+            if (confirm(`确定要删除股票代码 ${code} 吗？`)) {
+                const index = stockCodes.indexOf(code);
+                if (index !== -1) {
+                    stockCodes.splice(index, 1);
+                    updateStockList();
+
+                    const status = document.getElementById('status');
+                    status.textContent = `状态: 已删除股票代码 ${code}`;
+                    status.style.background = '#d4edda';
+                    status.style.borderColor = '#c3e6cb';
+                }
+            }
+        }
+
+        function updateStockList() {
+            const list = document.getElementById('stock-codes-list');
+            list.innerHTML = stockCodes.map(code => `
+                <div class="stock-code-item">
+                    <span>${code} - ${getStockName(code)}</span>
+                    <div>
+                        <button onclick="editStock(this)">编辑</button>
+                        <button onclick="deleteStock(this)">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStockName(code) {
+            const names = {
+                '000001': '平安银行',
+                '600000': '浦发银行',
+                '000858': '五粮液'
+            };
+            return names[code] || '未知股票';
+        }
+
+        function testAddStock() {
+            const testCode = '600519';
+            if (!stockCodes.includes(testCode)) {
+                stockCodes.push(testCode);
+                updateStockList();
+
+                const status = document.getElementById('status');
+                status.textContent = `状态: 测试添加股票代码 ${testCode}`;
+                status.style.background = '#d4edda';
+                status.style.borderColor = '#c3e6cb';
+            }
+        }
+
+        function testEditStock() {
+            if (stockCodes.length > 0) {
+                const status = document.getElementById('status');
+                status.textContent = '状态: 请点击股票代码列表中的编辑按钮进行测试';
+                status.style.background = '#fff3cd';
+                status.style.borderColor = '#ffeaa7';
+            }
+        }
+
+        function saveSettings() {
+            const refreshInterval = document.getElementById('refresh-interval').value;
+            const rotationInterval = document.getElementById('rotation-interval').value;
+
+            const status = document.getElementById('status');
+            status.textContent = `状态: 设置已保存 - 刷新间隔: ${refreshInterval}秒, 轮播间隔: ${rotationInterval}秒`;
+            status.style.background = '#d4edda';
+            status.style.borderColor = '#c3e6cb';
+        }
+
+        // 初始化
+        updateStockList();
+    </script>
+</body>
+
+</html>

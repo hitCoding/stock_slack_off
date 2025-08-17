@@ -401,13 +401,14 @@ body {
 .stock-code-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 6px 8px;
-    margin-bottom: 4px;
+    gap: 12px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
     background: white;
     border: 1px solid #e0e0e0;
-    border-radius: 3px;
+    border-radius: 6px;
     transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .stock-code-item:hover {
@@ -442,30 +443,27 @@ body {
 }
 
 .stock-code-actions button {
-    padding: 2px 6px;
+    padding: 6px;
     border: none;
-    border-radius: 3px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 0.8em;
+    font-size: 14px;
     transition: all 0.2s ease;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.edit-stock-btn {
-    background: #ffc107;
-    color: #333;
-}
-
-.edit-stock-btn:hover {
-    background: #ffb300;
-}
-
-.delete-stock-btn {
+.remove-stock-btn {
     background: #dc3545;
     color: white;
 }
 
-.delete-stock-btn:hover {
+.remove-stock-btn:hover {
     background: #c82333;
+    transform: scale(1.1);
 }
 
 .stock-code-input-group {
@@ -477,6 +475,21 @@ body {
 .stock-code-input-group input {
     flex: 1;
     padding: 8px;
+}
+
+.settings-help {
+    text-align: center;
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.settings-help small {
+    color: #667eea;
+    font-size: 0.9em;
+}
     border: 1px solid #ddd;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
