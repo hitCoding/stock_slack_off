@@ -1,0 +1,423 @@
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require('electron');
+const path = require('path');
+const schedule = require('node-schedule');
+const axios = require('axios');
+const fs = require('fs');
+const config = require('./config');
+
+let mainWindow;
+let tray;
+let stockData = new Map();
+let refreshInterval = config.stockDataRefreshInterval;
+let stockCodes = config.defaultStockCodes;
+let isRunning = false;
+let currentStockIndex = 0; // 当前显示的股票索引
+let stockDisplayTimer = null; // 股票显示轮播定时器
+
+// 应用配置
+app.commandLine.appendSwitch('--disable-gpu-cache');
+app.commandLine.appendSwitch('--disable-software-rasterizer');
+app.commandLine.appendSwitch('--disable-background-timer-throttling');
+app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+
+// 创建主窗口
+function createWindow() {
+    console.log('正在创建主窗口...');
+
+    mainWindow = new BrowserWindow({
+        width: 400,
+        height: 600,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
+            enableRemoteModule: false,
+            webSecurity: true,
+            allowRunningInsecureContent: false
+        },
+        icon: path.join(__dirname, 'assets/icon.png'),
+        show: true, // 改为true，让窗口显示
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        skipTaskbar: false, // 在任务栏显示
+        alwaysOnTop: false
+    });
+
+    console.log('主窗口已创建，正在加载HTML文件...');
+    mainWindow.loadFile('index.html');
+
+    // 窗口关闭时隐藏而不是退出
+    mainWindow.on('close', (event) => {
+        if (!app.isQuiting) {
+            event.preventDefault();
+            mainWindow.hide();
+        }
+    });
+
+    // 开发模式下显示开发者工具
+    if (process.argv.includes('--dev')) {
+        mainWindow.webContents.openDevTools();
+        console.log('开发模式已启用，开发者工具已打开');
+    }
+
+    console.log('主窗口创建完成');
+}
+
+// 创建任务栏按钮（类似资讯与兴趣）
+function createTaskbarButton() {
+    console.log('正在创建任务栏按钮...');
+
+    try {
+        // 检查图标文件是否存在
+        const iconPath = path.join(__dirname, 'assets/icon.png');
+        if (!fs.existsSync(iconPath)) {
+            console.warn('图标文件不存在，使用默认图标');
+            // 创建一个简单的默认图标
+            const defaultIcon = nativeImage.createFromBuffer(Buffer.from([
+                0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+                0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10,
+                0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0xF3, 0xFF, 0x61, 0x00, 0x00, 0x00,
+                0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x60, 0x18, 0x05, 0x00,
+                0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]));
+            mainWindow.setIcon(defaultIcon);
+        } else {
+            const icon = nativeImage.createFromPath(iconPath);
+            icon.resize({ width: 16, height: 16 });
+            mainWindow.setIcon(icon);
+        }
+
+        // 设置初始任务栏标题
+        mainWindow.setTitle('股票行情小工具');
+
+        // 点击任务栏按钮显示/隐藏窗口
+        mainWindow.on('show', () => {
+            console.log('窗口已显示');
+        });
+
+        mainWindow.on('hide', () => {
+            console.log('窗口已隐藏');
+        });
+
+        // 添加右键菜单支持
+        if (config.taskbarButton.rightClickMenu) {
+            mainWindow.webContents.on('context-menu', (event, params) => {
+                event.preventDefault();
+                showContextMenu(params.x, params.y);
+            });
+        }
+
+        console.log('任务栏按钮已创建');
+
+    } catch (error) {
+        console.error('创建任务栏按钮失败:', error);
+    }
+}
+
+// 更新任务栏标题和提示
+function updateTaskbarTitle() {
+    if (stockData.size === 0 || !config.showInTaskbar) return;
+
+    try {
+        const stockArray = Array.from(stockData.values());
+        const currentStock = stockArray[currentStockIndex];
+
+        if (currentStock) {
+            // 构建任务栏标题（简短显示）
+            let title = '';
+
+            if (config.taskbarDisplayFormat.showEmoji) {
+                const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
+                title += `${changeColor}`;
+            }
+
+            title += `${currentStock.code} ¥${currentStock.currentPrice}`;
+
+            if (config.taskbarDisplayFormat.showChangeSymbol) {
+                const changeSymbol = parseFloat(currentStock.change) >= 0 ? '↗' : '↘';
+                title += ` ${changeSymbol}${currentStock.change}`;
+            }
+
+            // 设置任务栏标题
+            if (config.taskbarDisplayFormat.showInTitle) {
+                mainWindow.setTitle(title);
+            }
+
+            // 设置任务栏提示（悬停显示）
+            if (config.taskbarDisplayFormat.showInTooltip) {
+                let tooltipText = '';
+
+                if (config.taskbarDisplayFormat.showEmoji) {
+                    const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
+                    tooltipText += `${changeColor} `;
+                }
+
+                tooltipText += `${currentStock.code} ${currentStock.name}\n¥${currentStock.currentPrice}`;
+
+                if (config.taskbarDisplayFormat.showChangeSymbol) {
+                    const changeSymbol = parseFloat(currentStock.change) >= 0 ? '↗' : '↘';
+                    tooltipText += ` ${changeSymbol}${currentStock.change}`;
+                }
+
+                if (config.taskbarDisplayFormat.showPercentage) {
+                    tooltipText += ` (${currentStock.changePercent}%)`;
+                }
+
+                // 限制提示长度
+                if (tooltipText.length > config.taskbarDisplayFormat.maxTooltipLength) {
+                    tooltipText = tooltipText.substring(0, config.taskbarDisplayFormat.maxTooltipLength) + '...';
+                }
+
+                // 设置窗口提示（会显示在任务栏悬停时）
+                mainWindow.setTitle(title);
+            }
+
+            console.log(`任务栏显示: ${currentStock.code} ${currentStock.name} ¥${currentStock.currentPrice}`);
+        }
+
+        // 移动到下一个股票
+        currentStockIndex = (currentStockIndex + 1) % stockArray.length;
+
+    } catch (error) {
+        console.error('更新任务栏显示失败:', error);
+    }
+}
+
+// 启动股票轮播显示
+function startStockRotation() {
+    if (!config.enableStockRotation) return;
+
+    if (stockDisplayTimer) {
+        clearInterval(stockDisplayTimer);
+    }
+
+    // 使用配置的轮播间隔
+    stockDisplayTimer = setInterval(() => {
+        updateTaskbarTitle();
+    }, config.stockRotationInterval);
+
+    console.log(`股票轮播显示已启动，每${config.stockRotationInterval / 1000}秒切换一次`);
+}
+
+// 停止股票轮播显示
+function stopStockRotation() {
+    if (stockDisplayTimer) {
+        clearInterval(stockDisplayTimer);
+        stockDisplayTimer = null;
+    }
+}
+
+// 获取股票数据
+async function fetchStockData() {
+    try {
+        console.log('正在获取股票数据...');
+
+        // 模拟股票数据（实际项目中应该调用真实的股票API）
+        const mockData = generateMockStockData();
+
+        // 更新股票数据
+        stockData.clear();
+        mockData.forEach(stock => {
+            stockData.set(stock.code, stock);
+        });
+
+        // 立即更新任务栏显示
+        updateTaskbarTitle();
+
+        // 启动股票轮播显示
+        startStockRotation();
+
+        // 通知渲染进程更新数据
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('stock-data-updated', Array.from(stockData.values()));
+        }
+
+        console.log('股票数据已更新:', new Date().toLocaleString());
+
+    } catch (error) {
+        console.error('获取股票数据失败:', error);
+    }
+}
+
+// 生成模拟股票数据
+function generateMockStockData() {
+    const stockNames = {
+        '000001': '平安银行',
+        '600000': '浦发银行',
+        '000858': '五粮液',
+        '000002': '万科A',
+        '600036': '招商银行',
+        '600519': '贵州茅台'
+    };
+
+    return stockCodes.map(code => {
+        const basePrice = 10 + Math.random() * 90;
+        const change = (Math.random() - 0.5) * 0.1; // ±5% 变化
+        const currentPrice = basePrice * (1 + change);
+        const previousPrice = basePrice;
+        const priceChange = currentPrice - previousPrice;
+        const changePercent = (priceChange / previousPrice) * 100;
+
+        return {
+            code: code,
+            name: stockNames[code] || `股票${code}`,
+            currentPrice: currentPrice.toFixed(2),
+            previousPrice: previousPrice.toFixed(2),
+            change: priceChange.toFixed(2),
+            changePercent: changePercent.toFixed(2),
+            volume: Math.floor(Math.random() * 1000000) + 100000,
+            timestamp: new Date()
+        };
+    });
+}
+
+// 启动定时任务
+function startScheduler() {
+    if (isRunning) return;
+
+    console.log('正在启动定时任务...');
+
+    // 立即获取一次数据
+    fetchStockData();
+
+    // 设置定时任务
+    schedule.scheduleJob(`*/${Math.ceil(refreshInterval / 1000)} * * * * *`, () => {
+        fetchStockData();
+    });
+
+    isRunning = true;
+    console.log(`股票数据定时刷新已启动，间隔: ${refreshInterval / 1000} 秒`);
+}
+
+// 停止定时任务
+function stopScheduler() {
+    if (!isRunning) return;
+
+    schedule.gracefulShutdown();
+    stopStockRotation();
+    isRunning = false;
+    console.log('股票数据定时刷新已停止');
+}
+
+// 重启定时任务
+function restartScheduler() {
+    stopScheduler();
+    startScheduler();
+}
+
+// IPC通信处理
+ipcMain.handle('get-stock-data', () => {
+    return Array.from(stockData.values());
+});
+
+ipcMain.handle('get-settings', () => {
+    return {
+        refreshInterval: refreshInterval,
+        stockCodes: stockCodes,
+        rotationInterval: config.stockRotationInterval
+    };
+});
+
+ipcMain.handle('update-settings', (event, settings) => {
+    refreshInterval = settings.refreshInterval;
+    stockCodes = settings.stockCodes;
+
+    // 更新配置
+    if (settings.rotationInterval) {
+        config.stockRotationInterval = settings.rotationInterval;
+    }
+
+    // 重启定时任务
+    restartScheduler();
+
+    return { success: true };
+});
+
+ipcMain.handle('fetch-stock-data', () => {
+    fetchStockData();
+    return { success: true };
+});
+
+// 显示右键菜单
+function showContextMenu(x, y) {
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: '股票行情',
+            enabled: false
+        },
+        { type: 'separator' },
+        ...Array.from(stockData.values()).map(stock => ({
+            label: `${stock.code} ${stock.name}: ¥${stock.currentPrice} ${stock.change >= 0 ? '+' : ''}${stock.change} (${stock.changePercent}%)`,
+            enabled: false
+        })),
+        { type: 'separator' },
+        {
+            label: '显示窗口',
+            click: () => {
+                mainWindow.show();
+                mainWindow.focus();
+            }
+        },
+        {
+            label: '设置',
+            click: () => {
+                mainWindow.show();
+                mainWindow.focus();
+                mainWindow.webContents.send('open-settings');
+            }
+        },
+        {
+            label: '立即刷新',
+            click: () => {
+                fetchStockData();
+            }
+        },
+        { type: 'separator' },
+        {
+            label: '退出',
+            click: () => {
+                app.isQuiting = true;
+                app.quit();
+            }
+        }
+    ]);
+
+    contextMenu.popup({ x, y });
+}
+
+// 应用事件处理
+app.whenReady().then(() => {
+    console.log('应用已准备就绪，开始初始化...');
+
+    createWindow();
+    createTaskbarButton();
+    startScheduler();
+
+    // 在macOS上，当所有窗口都关闭时，重新创建一个窗口
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
+
+    console.log('应用初始化完成');
+});
+
+// 当所有窗口都关闭时退出应用
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+// 应用退出前清理
+app.on('before-quit', () => {
+    stopScheduler();
+});
+
+// 处理应用退出
+app.on('quit', () => {
+    stopScheduler();
+});

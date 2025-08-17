@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票行情小工具</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 股票小工具 -->
+    <div id="stock-widget" class="stock-widget">
+        <div class="widget-header">
+            <span class="widget-title">
+                <i class="fas fa-chart-line"></i>
+                股票行情
+            </span>
+            <div class="widget-controls">
+                <button id="settings-btn" class="control-btn" title="设置">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button id="minimize-btn" class="control-btn" title="最小化到托盘">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button id="close-btn" class="control-btn" title="隐藏窗口">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="widget-content">
+            <div id="stock-list" class="stock-list">
+                <!-- 股票列表将通过JavaScript动态生成 -->
+                <div class="loading-placeholder">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>正在加载股票数据...</span>
+                </div>
+            </div>
+
+            <div class="widget-footer">
+                <div class="refresh-info">
+                    <span id="last-update">最后更新: --</span>
+                    <span id="next-update">下次更新: --</span>
+                </div>
+                <button id="refresh-btn" class="refresh-btn" title="立即刷新">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 设置面板 -->
+        <div id="settings-panel" class="settings-panel hidden">
+            <h3>设置</h3>
+
+            <!-- 股票代码管理 -->
+            <div class="setting-group">
+                <label>股票代码管理:</label>
+                <div class="stock-codes-manager">
+                    <div class="stock-codes-list" id="stock-codes-list">
+                        <!-- 股票代码列表将通过JavaScript动态生成 -->
+                    </div>
+                    <div class="stock-code-input-group">
+                        <input type="text" id="new-stock-code" placeholder="输入股票代码 (如: 000001)" maxlength="6">
+                        <button id="add-stock-btn" class="btn-add" title="添加股票">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="stock-codes-help">
+                        <small>支持格式: 000001(深市), 600000(沪市), 300001(创业板)</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label for="refresh-interval">数据刷新间隔 (秒):</label>
+                <input type="number" id="refresh-interval" min="5" max="300" value="30">
+            </div>
+            <div class="setting-group">
+                <label for="rotation-interval">任务栏轮播间隔 (秒):</label>
+                <input type="number" id="rotation-interval" min="2" max="60" value="5">
+                <small class="setting-help">在任务栏中每几秒切换显示一个股票</small>
+            </div>
+            <div class="setting-buttons">
+                <button id="save-settings" class="btn-primary">保存设置</button>
+                <button id="cancel-settings" class="btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系统托盘提示 -->
+    <div id="tray-notification" class="tray-notification hidden">
+        <div class="notification-content">
+            <i class="fas fa-info-circle"></i>
+            <span id="notification-text">应用已最小化到系统托盘</span>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
