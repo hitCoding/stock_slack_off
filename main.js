@@ -11,6 +11,20 @@ let stockData = new Map();
 let stockCodes = ['000001', '600000', '000858', '00001', '00700']; // 默认股票代码
 let currentStockIndex = 0; // 当前显示的股票索引
 
+// 中文股票名称到拼音缩写的映射
+let chineseToPinyinMap = {
+    '平安银行': 'PAYH',
+    '浦发银行': 'PFYH',
+    '五粮液': 'WLY',
+    '万科A': 'WKA',
+    '招商银行': 'ZSYH',
+    '贵州茅台': 'GZMT',
+    '长江实业': 'CJSY',
+    '腾讯控股': 'TXKG',
+    '中国移动': 'ZGYD',
+    '中国平安': 'ZGPA'
+};
+
 // 股票代码配置文件路径
 const STOCK_CODES_FILE = path.join(__dirname, 'stock-codes.json');
 // 股票名称配置文件路径
@@ -537,7 +551,7 @@ async function fetchRealStockData() {
 
         const url = `http://push2.eastmoney.com/api/qt/ulist.np/get?secids=${stockString}&fields=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f26,f22,f33,f11,f62,f128,f136,f115,f152`;
 
-        console.log('请求URL:', url);
+        // console.log('请求URL:', url);
 
         // 根据URL协议选择HTTP或HTTPS模块
         const urlObj = new URL(url);
@@ -666,30 +680,6 @@ function parseEastMoneyStockData(rawData) {
         return [];
     }
 }
-
-// 中文名称到拼音首字母的映射（默认值，如果配置文件不存在则使用）let chineseToPinyinMap = {
-    '平安银行': 'PAYH',
-    '浦发银行': 'PFYH',
-    '五粮液': 'WLY',
-    '万科A': 'WKA',
-    '招商银行': 'ZSYH',
-    '贵州茅台': 'GZMT',
-    '长江实业': 'CJSY',
-    '腾讯控股': 'TXKG',
-    '中国移动': 'ZGYD',
-    '中国平安': 'ZGPA',
-    '中芯国际': 'ZXGJ',
-    '华虹半导体': 'HHBDT',
-    '比亚迪': 'BYD',
-    '阿里巴巴': 'ALBB',
-    '京东': 'JD',
-    '美团': 'MT',
-    '小米集团': 'XMJT',
-    '网易': 'WY',
-    '拼多多': 'PDD',
-    '百度': 'BD',
-    '快手': 'KS'
-};
 
 // 获取股票名称的拼音首字母缩写
 function getStockNameAbbr(chineseName) {
