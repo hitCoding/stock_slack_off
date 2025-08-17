@@ -13,6 +13,8 @@ let currentStockIndex = 0; // 当前显示的股票索引
 
 // 股票代码配置文件路径
 const STOCK_CODES_FILE = path.join(__dirname, 'stock-codes.json');
+// 股票名称配置文件路径
+const STOCK_NAMES_CONFIG_FILE = path.join(__dirname, 'stock-names-config.json');
 let stockDisplayTimer = null; // 股票显示轮播定时器
 let dataRefreshTimer = null; // 数据刷新定时器
 
@@ -31,6 +33,25 @@ function loadStockCodes() {
     } catch (error) {
         console.error('❌ 读取股票代码配置文件失败:', error);
         console.log('🔄 使用默认股票代码');
+    }
+}
+
+// 读取股票名称配置文件
+function loadStockNamesConfig() {
+    try {
+        if (fs.existsSync(STOCK_NAMES_CONFIG_FILE)) {
+            const data = fs.readFileSync(STOCK_NAMES_CONFIG_FILE, 'utf8');
+            const config = JSON.parse(data);
+            if (config.stockNames) {
+                chineseToPinyinMap = { ...chineseToPinyinMap, ...config.stockNames };
+                console.log('✅ 已从配置文件加载股票名称映射，共', Object.keys(config.stockNames).length, '个');
+            }
+        } else {
+            console.log('📝 股票名称配置文件不存在，使用默认映射');
+        }
+    } catch (error) {
+        console.error('❌ 读取股票名称配置文件失败:', error);
+        console.log('🔄 使用默认股票名称映射');
     }
 }
 
@@ -64,7 +85,7 @@ function createWindow() {
             allowRunningInsecureContent: false
         },
         icon: path.join(__dirname, 'assets/icon.png'),
-        show: true, // 窗口显示
+        show: false, // 窗口显示
         resizable: false,
         minimizable: true, // 允许最小化
         maximizable: false,
@@ -121,9 +142,12 @@ function createFloatingWindow() {
     // 计算悬浮窗口位置（任务栏上方）
     const floatingWidth = 300;
     const floatingHeight = taskbarHeight; // 高度与任务栏一致
-    const floatingX = width - floatingWidth - 20; // 右下角，距离右边缘20px
-    const floatingY = height - floatingHeight; // 紧贴任务栏上方
-
+    const floatingX = width - floatingWidth - 200; // 右下角，距离右边缘20px
+    const floatingY = height - 20; // 紧贴任务栏上方
+    console.log('floatingX', floatingX);
+    console.log('floatingY', floatingY);
+    console.log('Width', width);
+    console.log('Height', height);
     floatingWindow = new BrowserWindow({
         width: floatingWidth,
         height: floatingHeight,
@@ -267,10 +291,33 @@ function updateFloatingDisplay() {
             const changeSymbol = parseFloat(currentStock.change) >= 0 ? '↗' : '↘';
             const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
 
+            // 生成股票代码缩写
+            let codeAbbr = currentStock.code;
+            if (isHKStock) {
+                // 港股：显示后4位，如 00001 -> 0001, 00700 -> 0700
+                codeAbbr = currentStock.code.slice(-4);
+            } else {
+                // A股：显示后3位，如 000001 -> 001, 600000 -> 000
+                codeAbbr = currentStock.code.slice(-3);
+            }
+
+            // 获取股票名称的拼音首字母缩写
+            let nameAbbr = getStockNameAbbr(currentStock.name);
+
+            // 如果没有找到拼音缩写，使用股票代码后3位
+            if (!nameAbbr) {
+                if (isHKStock) {
+                    nameAbbr = currentStock.code.slice(-3); // 港股显示后3位
+                } else {
+                    nameAbbr = currentStock.code.slice(-3); // A股显示后3位
+                }
+            }
+
             // 发送数据到悬浮窗口
             floatingWindow.webContents.send('update-stock-display', {
-                code: currentStock.code.slice(-3),
+                code: codeAbbr,
                 name: currentStock.name,
+                nameAbbr: nameAbbr,
                 currentPrice: currentStock.price,
                 change: currentStock.change,
                 changePercent: currentStock.changePercent,
@@ -620,6 +667,41 @@ function parseEastMoneyStockData(rawData) {
     }
 }
 
+// 中文名称到拼音首字母的映射（默认值，如果配置文件不存在则使用）let chineseToPinyinMap = {
+    '平安银行': 'PAYH',
+    '浦发银行': 'PFYH',
+    '五粮液': 'WLY',
+    '万科A': 'WKA',
+    '招商银行': 'ZSYH',
+    '贵州茅台': 'GZMT',
+    '长江实业': 'CJSY',
+    '腾讯控股': 'TXKG',
+    '中国移动': 'ZGYD',
+    '中国平安': 'ZGPA',
+    '中芯国际': 'ZXGJ',
+    '华虹半导体': 'HHBDT',
+    '比亚迪': 'BYD',
+    '阿里巴巴': 'ALBB',
+    '京东': 'JD',
+    '美团': 'MT',
+    '小米集团': 'XMJT',
+    '网易': 'WY',
+    '拼多多': 'PDD',
+    '百度': 'BD',
+    '快手': 'KS'
+};
+
+// 获取股票名称的拼音首字母缩写
+function getStockNameAbbr(chineseName) {
+    // 首先查找预定义的映射
+    if (chineseToPinyinMap[chineseName]) {
+        return chineseToPinyinMap[chineseName];
+    }
+
+    // 如果没有预定义映射，返回null，让调用方处理
+    return null;
+}
+
 // 生成模拟股票数据（备用）
 function generateMockStockData() {
     const stockNames = {
@@ -697,8 +779,20 @@ function updateTrayDisplay() {
             const changeSymbol = parseFloat(currentStock.change) >= 0 ? '↗' : '↘';
             const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
 
+            // 获取股票名称的拼音首字母缩写
+            let nameAbbr = getStockNameAbbr(currentStock.name);
+
+            // 如果没有找到拼音缩写，使用股票代码后3位
+            if (!nameAbbr) {
+                if (isHKStock) {
+                    nameAbbr = currentStock.code.slice(-3); // 港股显示后3位
+                } else {
+                    nameAbbr = currentStock.code.slice(-3); // A股显示后3位
+                }
+            }
+
             // 托盘提示文本
-            const tooltipText = `${changeColor} ${currentStock.code} ${currentStock.name}\n¥${currentStock.price.toFixed(isHKStock ? 3 : 2)} ${changeSymbol}${currentStock.change.toFixed(isHKStock ? 3 : 2)} (${currentStock.changePercent}%)`;
+            const tooltipText = `${changeColor} ${currentStock.code} ${currentStock.name}(${nameAbbr})\n¥${currentStock.price.toFixed(isHKStock ? 3 : 2)} ${changeSymbol}${currentStock.change.toFixed(isHKStock ? 3 : 2)} (${currentStock.changePercent}%)`;
 
             // 更新托盘提示
             tray.setToolTip(tooltipText);
@@ -898,6 +992,9 @@ app.whenReady().then(() => {
     // 首先加载股票代码配置
     loadStockCodes();
 
+    // 加载股票名称配置
+    loadStockNamesConfig();
+
     createWindow();
     createFloatingWindow(); // 创建悬浮窗口
     createTray();
@@ -916,7 +1013,8 @@ app.whenReady().then(() => {
 
     // 定期检查窗口状态（每30秒检查一次）
     setInterval(checkAndRestoreWindows, 30000);
-
+    //mainWindow.hide();
+    floatingWindow.show();
     // 在macOS上，当所有窗口都关闭时，重新创建一个窗口
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

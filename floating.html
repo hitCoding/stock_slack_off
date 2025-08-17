@@ -40,20 +40,28 @@
             flex-direction: row;
             justify-content: center;
             align-items: center;
-            gap: 15px;
+            gap: 5px;
             white-space: nowrap;
         }
 
         .stock-code {
-            font-size: 16px;
+            font-size: 18px;
+            font-weight: bold;
+            min-width: 80px;
+        }
+
+        .stock-name-abbr {
+            font-size: 18px;
             font-weight: bold;
             color: white;
-            min-width: 60px;
+            min-width: 80px;
+            text-align: center;
+
         }
 
         .stock-name {
-            font-size: 14px;
-            color: #E0E0E0;
+            font-size: 18px;
+            font-weight: bold;
             min-width: 80px;
         }
 
@@ -70,11 +78,11 @@
         }
 
         .stock-change.positive {
-            color: #00FF00;
+            color: white;
         }
 
         .stock-change.negative {
-            color: #FF4444;
+            color: white;
         }
 
         .stock-percent {
@@ -202,6 +210,12 @@
                 min-width: 50px;
             }
 
+            .stock-name-abbr {
+                font-size: 10px;
+                min-width: 40px;
+                padding: 1px 4px;
+            }
+
             .stock-name {
                 font-size: 12px;
                 min-width: 60px;
@@ -228,12 +242,18 @@
             }
 
             .stock-code {
-                font-size: 12px;
+                font-size: 14px;
                 min-width: 40px;
             }
 
+            .stock-name-abbr {
+                font-size: 9px;
+                min-width: 35px;
+                padding: 1px 3px;
+            }
+
             .stock-name {
-                font-size: 10px;
+                font-size: 14px;
                 min-width: 50px;
             }
 
@@ -255,15 +275,15 @@
         /* 高度响应式 */
         @media (max-height: 40px) {
             .stock-info {
-                gap: 10px;
+                gap: 5px;
             }
 
             .stock-code {
-                font-size: 14px;
+                font-size: 16px;
             }
 
             .stock-name {
-                font-size: 12px;
+                font-size: 16px;
             }
 
             .stock-price {
@@ -281,15 +301,15 @@
 
         @media (max-height: 30px) {
             .stock-info {
-                gap: 8px;
+                gap: 5px;
             }
 
             .stock-code {
-                font-size: 12px;
+                font-size: 14px;
             }
 
             .stock-name {
-                font-size: 10px;
+                font-size: 14px;
             }
 
             .stock-price {
@@ -315,12 +335,11 @@
         <div class="resize-handle" id="resizeHandle" title="拖拽调整大小"></div>
 
         <div class="stock-info" id="stockInfo">
-            <div class="stock-code" id="stockCode">000001</div>
-            <!--<div class="stock-name" id="stockName">平安银行</div>-->
-            <div class="stock-price" id="stockPrice">¥12.34</div>
-            <!--<div class="stock-change positive" id="stockChange">
-                ↗0.45 <span class="stock-percent">(+3.67%)</span>
-            </div>-->
+            <div class="stock-code" id="stockCode">001</div>
+            <!-- <div class="stock-name-abbr" id="stockNameAbbr">PAYH</div> -->
+            <div class="stock-price" id="stockPrice">12.34</div>
+            <!-- <div class="stock-change" id="stockChange"></div> -->
+            <div class="stock-code" id="stockPercent">(+3.67%)</div>
         </div>
     </div>
 
@@ -333,24 +352,43 @@
         // 更新股票显示
         function updateStockDisplay(data) {
             const stockCode = document.getElementById('stockCode');
-            const stockName = document.getElementById('stockName');
+            const stockNameAbbr = document.getElementById('stockNameAbbr');
             const stockPrice = document.getElementById('stockPrice');
             const stockChange = document.getElementById('stockChange');
-
+            const stockPercent = document.getElementById('stockPercent');
             if (stockCode) stockCode.textContent = data.code;
-            if (stockName) stockName.textContent = data.name;
-            if (stockPrice) stockPrice.textContent = `¥${data.currentPrice}`;
+            if (stockNameAbbr) stockNameAbbr.textContent = data.nameAbbr || 'N/A';
+            if (stockPercent) stockPercent.textContent = `${data.changePercent.toFixed(2)}`;
+            // 如果没有名称缩写，显示股票代码后3位
+            if (!data.nameAbbr && data.code) {
+                stockNameAbbr.textContent = data.code.slice(-3);
+            }
+
+            // 格式化价格显示
+            if (stockPrice) {
+                const price = parseFloat(data.currentPrice);
+                // 判断是否为港股（通过代码长度判断，港股通常是4位缩写）
+                const isHKStock = data.code.length === 4;
+                const formattedPrice = isHKStock ? price.toFixed(3) : price.toFixed(2);
+                stockPrice.textContent = `${formattedPrice}`;
+            }
 
             if (stockChange) {
                 const isPositive = parseFloat(data.change) >= 0;
                 stockChange.className = `stock-change ${isPositive ? 'positive' : 'negative'}`;
-                stockChange.innerHTML = `${data.changeSymbol}${Math.abs(data.change)} <span class="stock-percent">(${isPositive ? '+' : ''}${data.changePercent}%)</span>`;
+
+                // 格式化涨跌额显示
+                const change = parseFloat(data.change);
+                const isHKStock = data.code.length === 4;
+                const formattedChange = isHKStock ? Math.abs(change).toFixed(3) : Math.abs(change).toFixed(2);
+
+                // stockChange.innerHTML = `${data.changeSymbol}${formattedChange} <span class="stock-percent">(${isPositive ? '+' : ''}${data.changePercent.toFixed(2)}%)</span>`;
 
                 // 添加发光效果
-                stockChange.classList.add('glow');
-                setTimeout(() => {
-                    stockChange.classList.remove('glow');
-                }, 1000);
+                //    stockChange.classList.add('glow');
+                //  setTimeout(() => {
+                //    stockChange.classList.remove('glow');
+                //}, 1000);
             }
 
             // 添加脉冲动画
