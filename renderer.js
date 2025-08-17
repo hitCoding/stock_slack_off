@@ -1,7 +1,7 @@
 class StockWidgetRenderer {
     constructor() {
         this.stockData = [];
-        this.stockCodes = ['000001', '600000', '000858'];
+        this.stockCodes = ['000001', '600000', '000858', '00001', '00700'];
         this.refreshInterval = 30000; // 30秒
         this.rotationInterval = 5000; // 5秒
         this.currentStockIndex = 0;
@@ -53,6 +53,7 @@ class StockWidgetRenderer {
         this.bindEvents();
         this.loadMockData();
         this.startMockRefresh();
+        // 股票代码列表功能已移除
     }
 
     // 正常初始化
@@ -64,6 +65,7 @@ class StockWidgetRenderer {
             this.startDataRefresh();
             this.startStockRotation();
             this.updateLastUpdateTime();
+            // 股票代码列表功能已移除
         } catch (error) {
             console.error('初始化失败:', error);
             // 如果初始化失败，尝试备用方案
@@ -94,17 +96,7 @@ class StockWidgetRenderer {
 
     // 绑定事件
     bindEvents() {
-        // 设置按钮事件
-        const settingsBtn = document.getElementById('settings-btn');
-        if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => {
-                console.log('🎯 设置按钮被点击');
-                this.toggleSettings();
-            });
-            console.log('✅ 设置按钮事件已绑定');
-        } else {
-            console.error('❌ 设置按钮不存在');
-        }
+        // 设置按钮事件已移除
 
         // 刷新按钮事件
         const refreshBtn = document.getElementById('refresh-btn');
@@ -141,17 +133,6 @@ class StockWidgetRenderer {
                 e.preventDefault();
                 this.saveSettings();
             }
-            // ESC键关闭设置面板
-            if (e.key === 'Escape' && this.isSettingsVisible) {
-                this.toggleSettings();
-            }
-        });
-
-        // 点击外部区域关闭设置面板
-        document.addEventListener('click', (e) => {
-            if (this.isSettingsVisible && !e.target.closest('#settings-panel') && !e.target.closest('#settings-btn')) {
-                this.toggleSettings();
-            }
         });
 
         // 股票代码输入框回车事件
@@ -166,7 +147,7 @@ class StockWidgetRenderer {
             // 确保输入框始终可用
             stockInput.addEventListener('blur', () => {
                 setTimeout(() => {
-                    if (this.isSettingsVisible && stockInput) {
+                    if (stockInput) {
                         // 强制刷新输入框状态
                         this.forceRefreshInput();
                     }
@@ -198,10 +179,7 @@ class StockWidgetRenderer {
                 this.updateStockData(data);
             });
 
-            // 监听打开设置面板
-            window.electronAPI.on('open-settings', () => {
-                this.toggleSettings();
-            });
+            // 设置面板相关监听器已移除
 
             console.log('✅ IPC监听器设置完成');
         } catch (error) {
@@ -231,10 +209,9 @@ class StockWidgetRenderer {
 
             const settings = await window.electronAPI.invoke('get-settings');
             if (settings) {
-                this.refreshInterval = settings.refreshInterval || 30000;
-                this.rotationInterval = settings.rotationInterval || 5000;
                 this.stockCodes = settings.stockCodes || ['000001', '600000', '000858'];
                 this.updateLastUpdateTime();
+                // 股票代码列表功能已移除
             }
         } catch (error) {
             console.error('加载初始数据失败:', error);
@@ -267,9 +244,24 @@ class StockWidgetRenderer {
                 price: 123.10,
                 change: 0.26,
                 changePercent: 0.21
+            },
+            {
+                code: '00001',
+                name: '长江实业',
+                price: 45.20,
+                change: 0.85,
+                changePercent: 1.92
+            },
+            {
+                code: '00700',
+                name: '腾讯控股',
+                price: 320.80,
+                change: -2.40,
+                changePercent: -0.74
             }
         ];
         this.updateStockDisplay();
+        // 股票代码列表功能已移除
     }
 
     // 开始模拟数据刷新
@@ -340,101 +332,7 @@ class StockWidgetRenderer {
         }
     }
 
-    // 切换设置面板
-    toggleSettings() {
-        console.log('🔄 切换设置面板...');
-        const settingsPanel = document.getElementById('settings-panel');
-
-        if (!settingsPanel) {
-            console.error('❌ 设置面板不存在');
-            return;
-        }
-
-        if (settingsPanel.classList.contains('hidden')) {
-            // 强制显示样式
-            settingsPanel.style.display = 'block';
-            settingsPanel.style.visibility = 'visible';
-            settingsPanel.style.opacity = '1';
-            settingsPanel.style.position = 'relative';
-            settingsPanel.style.zIndex = '1000';
-
-            // 填充当前设置
-            const refreshInput = document.getElementById('refresh-interval');
-            const rotationInput = document.getElementById('rotation-interval');
-
-            if (refreshInput) {
-                refreshInput.value = this.refreshInterval / 1000;
-            }
-            if (rotationInput) {
-                rotationInput.value = this.rotationInterval / 1000;
-            }
-
-            // 更新股票代码列表显示
-            this.updateStockCodesList();
-
-            // 强制刷新输入框状态
-            this.forceRefreshInput();
-
-            settingsPanel.classList.remove('hidden');
-            this.isSettingsVisible = true;
-            console.log('✅ 设置面板已显示');
-        } else {
-            settingsPanel.classList.add('hidden');
-            settingsPanel.style.display = 'none';
-            this.isSettingsVisible = false;
-            console.log('✅ 设置面板已隐藏');
-        }
-    }
-
-    // 更新股票代码列表显示
-    updateStockCodesList() {
-        const stockCodesList = document.getElementById('stock-codes-list');
-        if (!stockCodesList) {
-            console.error('❌ 股票代码列表不存在');
-            return;
-        }
-
-        if (this.stockCodes.length === 0) {
-            stockCodesList.innerHTML = `
-                <div class="stock-codes-empty">
-                    <i class="fas fa-plus-circle"></i>
-                    <div>暂无股票代码，请添加</div>
-                </div>
-            `;
-            return;
-        }
-
-        stockCodesList.innerHTML = this.stockCodes.map(code => this.createStockCodeItem(code)).join('');
-
-        // 重新绑定事件
-        this.bindStockCodeEvents();
-    }
-
-    // 创建股票代码项
-    createStockCodeItem(code) {
-        const stock = this.stockData.find(s => s.code === code);
-        const name = stock ? stock.name : '未知股票';
-
-        return `
-            <div class="stock-code-item" data-code="${code}">
-                <div class="stock-code-actions">
-                    <button class="remove-stock-btn" title="删除股票" onclick="stockWidget.removeStockCode('${code}')">
-                        <i class="fas fa-minus-circle"></i>
-                    </button>
-                </div>
-                <div class="stock-code-info">
-                    <span class="stock-code-text">${code}</span>
-                    <span class="stock-code-name">${name}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    // 绑定股票代码事件
-    bindStockCodeEvents() {
-        // 编辑按钮事件已在HTML中通过onclick绑定
-        // 删除按钮事件已在HTML中通过onclick绑定
-    }
+    // 股票代码列表功能已移除，删除按钮直接集成在股票显示中
 
     // 添加股票代码
     addStockCode() {
@@ -484,7 +382,6 @@ class StockWidgetRenderer {
         }
 
         // 更新显示
-        this.updateStockCodesList();
         this.updateStockDisplay();
 
         // 清空输入框
@@ -532,7 +429,6 @@ class StockWidgetRenderer {
             }
 
             // 更新显示
-            this.updateStockCodesList();
             this.updateStockDisplay();
 
             // 保存设置
@@ -551,23 +447,20 @@ class StockWidgetRenderer {
 
     // 验证股票代码格式
     isValidStockCode(code) {
-        return /^(0|3|6)\d{5}$/.test(code);
+        // 支持：
+        // 000001-000999: 深市主板
+        // 002001-002999: 深市中小板  
+        // 300001-300999: 深市创业板
+        // 600001-600999: 沪市主板
+        // 688001-688999: 沪市科创板
+        // 00001-09999: 香港主板
+        return /^(0|3|6)\d{5}$|^0\d{4}$/.test(code);
     }
 
     // 保存设置
     async saveSettings() {
         try {
-            const refreshInterval = document.getElementById('refresh-interval');
-            const rotationInterval = document.getElementById('rotation-interval');
-
-            if (refreshInterval && rotationInterval) {
-                this.refreshInterval = parseInt(refreshInterval.value) * 1000;
-                this.rotationInterval = parseInt(rotationInterval.value) * 1000;
-            }
-
             const settings = {
-                refreshInterval: this.refreshInterval,
-                rotationInterval: this.rotationInterval,
                 stockCodes: this.stockCodes
             };
 
@@ -575,16 +468,7 @@ class StockWidgetRenderer {
                 await window.electronAPI.invoke('update-settings', settings);
             }
 
-            this.showNotification('设置已保存');
-
-            // 重新启动定时器
-            this.startDataRefresh();
-            this.startStockRotation();
-
-            // 保存设置后自动回到主界面
-            setTimeout(() => {
-                this.toggleSettings();
-            }, 1000);
+            this.showNotification('股票代码已保存');
 
         } catch (error) {
             console.error('保存设置失败:', error);
@@ -626,19 +510,34 @@ class StockWidgetRenderer {
         const stockList = document.getElementById('stock-list');
         if (!stockList) return;
 
-        stockList.innerHTML = this.stockData.map(stock => `
-            <div class="stock-item">
-                <div class="stock-header">
-                    <div class="stock-code">${stock.code}</div>
-                    <div class="stock-name">${stock.name}</div>
+        stockList.innerHTML = this.stockData.map(stock => {
+            // 判断是否为港股（5位代码，以0开头）
+            const isHKStock = stock.code.length === 5 && stock.code.startsWith('0');
+
+            // 根据股票类型格式化价格
+            const priceDisplay = isHKStock ?
+                stock.price.toFixed(3) : // 港股显示3位小数
+                stock.price.toFixed(2);  // A股显示2位小数
+
+            return `
+                <div class="stock-item" data-code="${stock.code}">
+                    <div class="stock-header">
+                        <div class="stock-code">${stock.code}</div>
+                        <div class="stock-name">
+                            ${stock.name}
+                            <button class="stock-delete-btn" title="删除股票" onclick="stockWidget.removeStockCode('${stock.code}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="stock-price">¥${priceDisplay}</div>
+                    <div class="stock-change ${stock.change >= 0 ? 'positive' : 'negative'}">
+                        ${stock.change >= 0 ? '↗' : '↘'}${Math.abs(stock.change).toFixed(isHKStock ? 3 : 2)} 
+                        <span class="stock-percent">(${stock.change >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%)</span>
+                    </div>
                 </div>
-                <div class="stock-price">¥${stock.price.toFixed(2)}</div>
-                <div class="stock-change ${stock.change >= 0 ? 'positive' : 'negative'}">
-                    ${stock.change >= 0 ? '↗' : '↘'}${Math.abs(stock.change).toFixed(2)} 
-                    <span class="stock-percent">(${stock.change >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%)</span>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     // 开始数据刷新

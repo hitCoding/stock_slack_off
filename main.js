@@ -8,7 +8,7 @@ let mainWindow;
 let floatingWindow; // 悬浮窗口
 let tray;
 let stockData = new Map();
-let stockCodes = ['000001', '600000', '000858']; // 默认股票代码
+let stockCodes = ['000001', '600000', '000858', '00001', '00700']; // 默认股票代码
 let currentStockIndex = 0; // 当前显示的股票索引
 
 // 股票代码配置文件路径
@@ -22,7 +22,7 @@ function loadStockCodes() {
         if (fs.existsSync(STOCK_CODES_FILE)) {
             const data = fs.readFileSync(STOCK_CODES_FILE, 'utf8');
             const config = JSON.parse(data);
-            stockCodes = config.stockCodes || ['000001', '600000', '000858'];
+            stockCodes = config.stockCodes || ['000001', '600000', '000858', '00001', '00700'];
             console.log('✅ 已从配置文件加载股票代码:', stockCodes);
         } else {
             console.log('📝 配置文件不存在，使用默认股票代码');
@@ -260,6 +260,9 @@ function updateFloatingDisplay() {
         const currentStock = stockArray[currentStockIndex];
 
         if (currentStock) {
+            // 判断是否为港股
+            const isHKStock = currentStock.code.length === 5 && currentStock.code.startsWith('0');
+
             // 构建显示文本
             const changeSymbol = parseFloat(currentStock.change) >= 0 ? '↗' : '↘';
             const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
@@ -275,7 +278,7 @@ function updateFloatingDisplay() {
                 changeColor: changeColor
             });
 
-            console.log(`悬浮窗口显示: ${currentStock.code} ${currentStock.price} ${changeSymbol}${currentStock.change}`);
+            // console.log(`悬浮窗口显示: ${currentStock.code} ${currentStock.price.toFixed(isHKStock ? 3 : 2)} ${changeSymbol}${currentStock.change.toFixed(isHKStock ? 3 : 2)}`);
         }
 
         // 移动到下一个股票
@@ -471,13 +474,15 @@ function createTray() {
 // 获取真实股票数据（东方财富API）
 async function fetchRealStockData() {
     try {
-        console.log('正在获取东方财富实时股票数据...');
+        // console.log('正在获取东方财富实时股票数据...');
 
         // 构建股票代码字符串（东方财富格式）
         const stockString = stockCodes.map(code => {
             // 根据股票代码前缀判断市场
             if (code.startsWith('6')) {
                 return `1.${code}`; // 上海市场
+            } else if (code.startsWith('0') && code.length === 5) {
+                return `116.${code}`; // 香港市场
             } else {
                 return `0.${code}`; // 深圳市场
             }
@@ -528,8 +533,8 @@ async function fetchRealStockData() {
             mainWindow.webContents.send('stock-data-updated', Array.from(stockData.values()));
         }
 
-        console.log('东方财富股票数据已更新:', new Date().toLocaleString());
-        console.log('获取到股票数量:', stockData.size);
+        // console.log('东方财富股票数据已更新:', new Date().toLocaleString());
+        // console.log('获取到股票数量:', stockData.size);
 
     } catch (error) {
         console.error('获取东方财富股票数据失败:', error);
@@ -558,15 +563,22 @@ function parseEastMoneyStockData(rawData) {
 
                     const code = item.f12; // 股票代码
                     const name = item.f14; // 股票名称
-                    const currentPrice = item.f2 / 100; // 最新价（除以100）
-                    const previousPrice = item.f18 / 100; // 昨收价（除以100）
-                    const openPrice = item.f17 / 100; // 今开价（除以100）
-                    const highPrice = item.f15 / 100; // 最高价（除以100）
-                    const lowPrice = item.f16 / 100; // 最低价（除以100）
+
+                    // 判断是否为港股（5位代码，以0开头）
+                    const isHKStock = code.length === 5 && code.startsWith('0');
+
+                    // 港股价格需要除以1000，A股价格除以100
+                    const priceDivisor = isHKStock ? 1000 : 100;
+
+                    const currentPrice = item.f2 / priceDivisor; // 最新价
+                    const previousPrice = item.f18 / priceDivisor; // 昨收价
+                    const openPrice = item.f17 / priceDivisor; // 今开价
+                    const highPrice = item.f15 / priceDivisor; // 最高价
+                    const lowPrice = item.f16 / priceDivisor; // 最低价
                     const volume = item.f5; // 成交量
                     const amount = item.f6; // 成交额
                     const changePercent = item.f3 / 100; // 涨跌幅（除以100）
-                    const priceChange = item.f4 / 100; // 涨跌额（除以100）
+                    const priceChange = item.f4 / priceDivisor; // 涨跌额
 
                     // 计算涨跌额（如果API没有提供）
                     let finalPriceChange = priceChange;
@@ -583,8 +595,8 @@ function parseEastMoneyStockData(rawData) {
                     const stock = {
                         code: code,
                         name: name,
-                        price: parseFloat(currentPrice.toFixed(2)),
-                        change: parseFloat(finalPriceChange.toFixed(2)),
+                        price: parseFloat(currentPrice.toFixed(isHKStock ? 3 : 2)),
+                        change: parseFloat(finalPriceChange.toFixed(isHKStock ? 3 : 2)),
                         changePercent: parseFloat(finalChangePercent.toFixed(2)),
                         volume: volume,
                         amount: amount,
@@ -592,7 +604,7 @@ function parseEastMoneyStockData(rawData) {
                     };
 
                     stocks.push(stock);
-                    console.log(`解析股票数据: ${code} ${name} ¥${currentPrice.toFixed(2)} ${finalPriceChange >= 0 ? '↗' : '↘'}${Math.abs(finalPriceChange).toFixed(2)} (${finalChangePercent.toFixed(2)}%)`);
+                    //console.log(`解析股票数据: ${code} ${name} ¥${currentPrice.toFixed(isHKStock ? 3 : 2)} ${finalPriceChange >= 0 ? '↗' : '↘'}${Math.abs(finalPriceChange).toFixed(isHKStock ? 3 : 2)} (${finalChangePercent.toFixed(2)}%)`);
 
                 } catch (parseError) {
                     console.log('解析单个股票数据失败:', parseError.message);
@@ -616,12 +628,26 @@ function generateMockStockData() {
         '000858': '五粮液',
         '000002': '万科A',
         '600036': '招商银行',
-        '600519': '贵州茅台'
+        '600519': '贵州茅台',
+        '00001': '长江实业',
+        '00700': '腾讯控股',
+        '00941': '中国移动',
+        '02318': '中国平安'
     };
 
     const mockData = stockCodes.map(code => {
-        const basePrice = 10 + Math.random() * 90;
-        const change = (Math.random() - 0.5) * 0.1; // ±5% 变化
+        // 判断是否为港股
+        const isHKStock = code.length === 5 && code.startsWith('0');
+
+        // 港股使用更高的基础价格和更小的变化幅度
+        const basePrice = isHKStock ?
+            (50 + Math.random() * 150) : // 港股基础价格50-200
+            (10 + Math.random() * 90);   // A股基础价格10-100
+
+        const change = isHKStock ?
+            (Math.random() - 0.5) * 0.02 : // 港股±1%变化
+            (Math.random() - 0.5) * 0.1;   // A股±5%变化
+
         const currentPrice = basePrice * (1 + change);
         const previousPrice = basePrice;
         const priceChange = currentPrice - previousPrice;
@@ -630,8 +656,8 @@ function generateMockStockData() {
         return {
             code: code,
             name: stockNames[code] || `股票${code}`,
-            price: parseFloat(currentPrice.toFixed(2)),
-            change: parseFloat(priceChange.toFixed(2)),
+            price: parseFloat(currentPrice.toFixed(isHKStock ? 3 : 2)),
+            change: parseFloat(priceChange.toFixed(isHKStock ? 3 : 2)),
             changePercent: parseFloat(changePercent.toFixed(2)),
             volume: Math.floor(Math.random() * 1000000) + 100000,
             timestamp: new Date()
@@ -664,17 +690,20 @@ function updateTrayDisplay() {
         const currentStock = stockArray[currentStockIndex];
 
         if (currentStock) {
+            // 判断是否为港股
+            const isHKStock = currentStock.code.length === 5 && currentStock.code.startsWith('0');
+
             // 构建显示文本
             const changeSymbol = parseFloat(currentStock.change) >= 0 ? '↗' : '↘';
             const changeColor = parseFloat(currentStock.change) >= 0 ? '🟢' : '🔴';
 
             // 托盘提示文本
-            const tooltipText = `${changeColor} ${currentStock.code} ${currentStock.name}\n¥${currentStock.price} ${changeSymbol}${currentStock.change} (${currentStock.changePercent}%)`;
+            const tooltipText = `${changeColor} ${currentStock.code} ${currentStock.name}\n¥${currentStock.price.toFixed(isHKStock ? 3 : 2)} ${changeSymbol}${currentStock.change.toFixed(isHKStock ? 3 : 2)} (${currentStock.changePercent}%)`;
 
             // 更新托盘提示
             tray.setToolTip(tooltipText);
 
-            console.log(`托盘显示: ${currentStock.code} ${currentStock.price} ${changeSymbol}${currentStock.change}`);
+            //console.log(`托盘显示: ${currentStock.code} ${currentStock.price.toFixed(isHKStock ? 3 : 2)} ${changeSymbol}${currentStock.change.toFixed(isHKStock ? 3 : 2)}`);
         }
 
         // 移动到下一个股票
@@ -740,9 +769,7 @@ function setupIpcHandlers() {
     // 处理获取设置请求
     ipcMain.handle('get-settings', async () => {
         return {
-            stockCodes: stockCodes,
-            refreshInterval: 30000, // 30秒
-            rotationInterval: 5000  // 5秒
+            stockCodes: stockCodes
         };
     });
 
@@ -834,11 +861,11 @@ function checkAndRestoreWindows() {
         // 检查主窗口
         if (!mainWindow || mainWindow.isDestroyed()) {
             console.warn('⚠️ 主窗口不存在或已销毁，重新创建');
-            createWindow();
+            // createWindow();
         } else if (!mainWindow.isVisible() && !mainWindow.isMinimized()) {
             console.warn('⚠️ 主窗口不可见且未最小化，尝试恢复');
-            mainWindow.show();
-            mainWindow.focus();
+            // mainWindow.show();
+            //mainWindow.focus();
         }
 
         // 检查悬浮窗口

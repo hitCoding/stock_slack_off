@@ -75,13 +75,7 @@ body {
     background: rgba(255, 255, 255, 0.2);
 }
 
-#settings-btn {
-    background: rgba(74, 144, 226, 0.8);
-}
-
-#settings-btn:hover {
-    background: rgba(74, 144, 226, 1);
-}
+/* 设置按钮样式已移除 */
 
 /* 小工具内容 */
 .widget-content {
@@ -94,6 +88,15 @@ body {
     margin-bottom: 20px;
 }
 
+/* 股票代码输入区域 */
+.stock-input-section {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
 .stock-item {
     display: flex;
     justify-content: space-between;
@@ -101,6 +104,48 @@ body {
     padding: 12px 0;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
+}
+
+.stock-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stock-code {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.stock-name {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stock-delete-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.stock-delete-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    background: #c82333;
 }
 
 .stock-item:last-child {
@@ -383,88 +428,7 @@ body {
     color: #3b82f6;
 }
 
-/* 股票代码管理样式 */
-.stock-codes-manager {
-    margin-top: 10px;
-}
-
-.stock-codes-list {
-    max-height: 150px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 8px;
-    margin-bottom: 10px;
-    background: #f9f9f9;
-}
-
-.stock-code-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    margin-bottom: 6px;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.stock-code-item:hover {
-    background: #f0f8ff;
-    border-color: #4a90e2;
-}
-
-.stock-code-item:last-child {
-    margin-bottom: 0;
-}
-
-.stock-code-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.stock-code-text {
-    font-family: 'Courier New', monospace;
-    font-weight: bold;
-    color: #333;
-}
-
-.stock-code-name {
-    color: #666;
-    font-size: 0.9em;
-}
-
-.stock-code-actions {
-    display: flex;
-    gap: 4px;
-}
-
-.stock-code-actions button {
-    padding: 6px;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s ease;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.remove-stock-btn {
-    background: #dc3545;
-    color: white;
-}
-
-.remove-stock-btn:hover {
-    background: #c82333;
-    transform: scale(1.1);
-}
+/* 股票代码管理样式已简化，删除按钮直接集成在股票显示中 */
 
 .stock-code-input-group {
     display: flex;
@@ -527,57 +491,4 @@ body {
     line-height: 1.4;
 }
 
-/* 编辑模式样式 */
-.stock-code-item.editing {
-    background: #fff3cd;
-    border-color: #ffc107;
-}
-
-.stock-code-item.editing .stock-code-info {
-    flex: 1;
-}
-
-.stock-code-item.editing input {
-    width: 100%;
-    padding: 4px 6px;
-    border: 1px solid #ffc107;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-}
-
-.stock-code-item.editing .stock-code-actions {
-    gap: 6px;
-}
-
-.save-edit-btn {
-    background: #28a745;
-    color: white;
-}
-
-.save-edit-btn:hover {
-    background: #218838;
-}
-
-.cancel-edit-btn {
-    background: #6c757d;
-    color: white;
-}
-
-.cancel-edit-btn:hover {
-    background: #5a6268;
-}
-
-/* 空状态样式 */
-.stock-codes-empty {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
-}
-
-.stock-codes-empty i {
-    font-size: 2em;
-    margin-bottom: 10px;
-    opacity: 0.5;
-}
+/* 编辑模式样式已移除 */
