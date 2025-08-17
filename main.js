@@ -11,6 +11,10 @@ let stockData = new Map();
 let stockCodes = ['000001', '600000', '000858', '00001', '00700']; // 默认股票代码
 let currentStockIndex = 0; // 当前显示的股票索引
 
+// 定时器配置
+let stockDisplayInterval = 3000; // 股票显示轮播间隔（毫秒）
+let dataRefreshInterval = 30000; // 数据刷新间隔（毫秒）
+
 // 中文股票名称到拼音缩写的映射
 let chineseToPinyinMap = {
     '平安银行': 'PAYH',
@@ -25,23 +29,124 @@ let chineseToPinyinMap = {
     '中国平安': 'ZGPA'
 };
 
+// 获取配置文件目录（始终使用 exe 所在目录，确保配置文件不被打包）
+function getUserDataPath() {
+    // 无论是开发环境还是生产环境，都优先使用 exe 所在目录
+    try {
+        // 获取 exe 文件所在目录
+        const exeDir = process.execPath ? path.dirname(process.execPath) : __dirname;
+        console.log('📁 可执行文件目录:', exeDir);
+
+        // 检查 exe 目录中是否存在配置文件
+        const configInExeDir = path.join(exeDir, 'stock-codes.json');
+        if (fs.existsSync(configInExeDir)) {
+            console.log('✅ 在可执行文件目录中找到配置文件');
+            return exeDir;
+        }
+
+        // 如果 exe 目录中没有配置文件，使用当前工作目录
+        const currentDir = process.cwd();
+        console.log('📁 当前工作目录:', currentDir);
+
+        // 检查当前工作目录中是否存在配置文件
+        const configInCurrentDir = path.join(currentDir, 'stock-codes.json');
+        if (fs.existsSync(configInCurrentDir)) {
+            console.log('✅ 在当前工作目录中找到配置文件');
+            return currentDir;
+        }
+
+        // 如果都没有找到，使用 exe 目录（用户需要手动创建配置文件）
+        console.log('📝 未找到配置文件，将使用可执行文件目录');
+        return exeDir;
+
+    } catch (error) {
+        console.warn('⚠️ 路径解析失败，使用当前目录:', error.message);
+        return __dirname;
+    }
+}
+
+// 获取资源文件路径（始终使用当前目录）
+function getResourcePath(relativePath) {
+    // 始终使用当前目录，确保资源文件从正确位置加载
+    const resourcePath = path.join(__dirname, relativePath);
+
+    // 检查文件是否存在，如果不存在则记录警告
+    if (!fs.existsSync(resourcePath)) {
+        console.warn(`⚠️ 资源文件不存在: ${resourcePath}`);
+        console.warn(`📁 当前目录: ${__dirname}`);
+        console.warn(`🔍 尝试查找的文件: ${relativePath}`);
+    }
+
+    return resourcePath;
+}
+
+// 验证必需的资源文件
+function validateResourceFiles() {
+    const requiredFiles = [
+        'assets/icon.png',
+        'index.html',
+        'floating.html',
+        'preload.js'
+    ];
+
+    console.log('🔍 验证必需的资源文件...');
+    console.log('📁 当前目录:', __dirname);
+
+    let missingFiles = [];
+
+    requiredFiles.forEach(file => {
+        const filePath = path.join(__dirname, file);
+        if (fs.existsSync(filePath)) {
+            console.log(`✅ ${file} - 存在`);
+        } else {
+            console.warn(`❌ ${file} - 不存在`);
+            missingFiles.push(file);
+        }
+    });
+
+    if (missingFiles.length > 0) {
+        console.warn('⚠️ 以下必需文件缺失:');
+        missingFiles.forEach(file => console.warn(`   - ${file}`));
+        console.warn('📝 请确保这些文件在当前目录中存在');
+    } else {
+        console.log('✅ 所有必需的资源文件都存在');
+    }
+
+    return missingFiles.length === 0;
+}
+
 // 股票代码配置文件路径
-const STOCK_CODES_FILE = path.join(__dirname, 'stock-codes.json');
+const STOCK_CODES_FILE = path.join(getUserDataPath(), 'stock-codes.json');
 // 股票名称配置文件路径
-const STOCK_NAMES_CONFIG_FILE = path.join(__dirname, 'stock-names-config.json');
+const STOCK_NAMES_CONFIG_FILE = path.join(getUserDataPath(), 'stock-names-config.json');
 let stockDisplayTimer = null; // 股票显示轮播定时器
 let dataRefreshTimer = null; // 数据刷新定时器
 
 // 读取股票代码配置文件
 function loadStockCodes() {
     try {
+        console.log('🔍 尝试加载配置文件:', STOCK_CODES_FILE);
+        console.log('📁 配置文件目录:', getUserDataPath());
+        console.log('📁 当前目录:', __dirname);
+
         if (fs.existsSync(STOCK_CODES_FILE)) {
             const data = fs.readFileSync(STOCK_CODES_FILE, 'utf8');
             const config = JSON.parse(data);
             stockCodes = config.stockCodes || ['000001', '600000', '000858', '00001', '00700'];
+
+            // 读取定时器配置
+            if (config.timers) {
+                stockDisplayInterval = config.timers.stockDisplayInterval || 3000;
+                dataRefreshInterval = config.timers.dataRefreshInterval || 30000;
+                console.log('✅ 已从配置文件加载定时器配置:');
+                console.log('   - 股票显示轮播间隔:', stockDisplayInterval, '毫秒');
+                console.log('   - 数据刷新间隔:', dataRefreshInterval, '毫秒');
+            }
+
             console.log('✅ 已从配置文件加载股票代码:', stockCodes);
         } else {
             console.log('📝 配置文件不存在，使用默认股票代码');
+            console.log('📝 尝试创建配置文件...');
             saveStockCodes(); // 创建默认配置文件
         }
     } catch (error) {
@@ -72,14 +177,30 @@ function loadStockNamesConfig() {
 // 保存股票代码到配置文件
 function saveStockCodes() {
     try {
+        console.log('💾 尝试保存配置文件到:', STOCK_CODES_FILE);
+
+        // 确保目录存在
+        const configDir = path.dirname(STOCK_CODES_FILE);
+        if (!fs.existsSync(configDir)) {
+            console.log('📁 创建配置目录:', configDir);
+            fs.mkdirSync(configDir, { recursive: true });
+        }
+
         const config = {
             stockCodes: stockCodes,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            timers: {
+                stockDisplayInterval: stockDisplayInterval,
+                dataRefreshInterval: dataRefreshInterval
+            }
         };
         fs.writeFileSync(STOCK_CODES_FILE, JSON.stringify(config, null, 2), 'utf8');
-        console.log('✅ 股票代码已保存到配置文件:', stockCodes);
+        console.log('✅ 股票代码和定时器配置已保存到配置文件:', stockCodes);
+        console.log('✅ 配置文件路径:', STOCK_CODES_FILE);
     } catch (error) {
         console.error('❌ 保存股票代码配置文件失败:', error);
+        console.error('❌ 错误详情:', error.message);
+        console.error('❌ 错误堆栈:', error.stack);
     }
 }
 
@@ -93,12 +214,16 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
+            preload: getResourcePath('preload.js'),
             enableRemoteModule: false,
-            webSecurity: true,
-            allowRunningInsecureContent: false
+            webSecurity: false, // 禁用 Web 安全以允许本地资源
+            allowRunningInsecureContent: true, // 允许不安全内容
+            // 禁用缓存相关功能
+            enableWebSQL: false,
+            // 设置缓存策略
+            partition: 'persist:main'
         },
-        icon: path.join(__dirname, 'assets/icon.png'),
+        icon: getResourcePath('assets/icon.png'),
         show: false, // 窗口显示
         resizable: false,
         minimizable: true, // 允许最小化
@@ -108,7 +233,7 @@ function createWindow() {
     });
 
     console.log('主窗口已创建，正在加载HTML文件...');
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(getResourcePath('index.html'));
 
     // 设置任务栏标题
     mainWindow.setTitle('股票行情小工具');
@@ -170,12 +295,16 @@ function createFloatingWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
+            preload: getResourcePath('preload.js'),
             enableRemoteModule: false,
-            webSecurity: true,
-            allowRunningInsecureContent: false
+            webSecurity: false, // 禁用 Web 安全以允许本地资源
+            allowRunningInsecureContent: true, // 允许不安全内容
+            // 禁用缓存相关功能
+            enableWebSQL: false,
+            // 设置缓存策略
+            partition: 'persist:floating'
         },
-        icon: path.join(__dirname, 'assets/icon.png'),
+        icon: getResourcePath('assets/icon.png'),
         show: false, // 初始隐藏
         resizable: true, // 允许调整大小
         minimizable: false,
@@ -196,7 +325,7 @@ function createFloatingWindow() {
     });
 
     // 加载悬浮窗口HTML
-    floatingWindow.loadFile('floating.html');
+    floatingWindow.loadFile(getResourcePath('floating.html'));
 
     // 设置窗口属性
     floatingWindow.setIgnoreMouseEvents(false, { forward: true });
@@ -252,9 +381,14 @@ function createFloatingWindow() {
 function showFloatingWindow() {
     try {
         if (floatingWindow && !floatingWindow.isDestroyed()) {
-            floatingWindow.show();
+
+            if (floatingX > 1050) {
+                floatingWindow.setPosition(floatingX, floatingX - 50);
+            }
             floatingWindow.setAlwaysOnTop(true, 'screen-saver');
             floatingWindow.setAlwaysOnTop(true, 'floating');
+            floatingWindow.hide();
+            floatingWindow.show();
             console.log('✅ 悬浮窗口已显示');
         } else {
             console.warn('⚠️ 悬浮窗口不存在或已销毁，重新创建');
@@ -356,15 +490,15 @@ function createTray() {
         console.log('正在创建系统托盘...');
 
         // 创建托盘图标
-        const iconPath = path.join(__dirname, 'assets/icon.png');
+        const iconPath = getResourcePath('assets/icon.png');
         let icon = nativeImage.createFromPath(iconPath);
 
         // 根据平台调整图标大小和设置
         if (process.platform === 'darwin') {
             // macOS: 状态栏图标需要特殊处理
             // 首先尝试加载@2x版本（如果存在）
-            const icon2xPath = path.join(__dirname, 'assets/icon@2x.png');
-            const icon3xPath = path.join(__dirname, 'assets/icon@3x.png');
+            const icon2xPath = getResourcePath('assets/icon@2x.png');
+            const icon3xPath = getResourcePath('assets/icon@3x.png');
 
             try {
                 if (require('fs').existsSync(icon2xPath)) {
@@ -665,7 +799,7 @@ function parseEastMoneyStockData(rawData) {
                     };
 
                     stocks.push(stock);
-                    //console.log(`解析股票数据: ${code} ${name} ¥${currentPrice.toFixed(isHKStock ? 3 : 2)} ${finalPriceChange >= 0 ? '↗' : '↘'}${Math.abs(finalPriceChange).toFixed(isHKStock ? 3 : 2)} (${finalChangePercent.toFixed(2)}%)`);
+                    console.log(`解析数据: ${code} ${name} ¥${currentPrice.toFixed(isHKStock ? 3 : 2)} ${finalPriceChange >= 0 ? '↗' : '↘'}${Math.abs(finalPriceChange).toFixed(isHKStock ? 3 : 2)} (${finalChangePercent.toFixed(2)}%)`);
 
                 } catch (parseError) {
                     console.log('解析单个股票数据失败:', parseError.message);
@@ -804,13 +938,13 @@ function startStockRotation() {
         clearInterval(stockDisplayTimer);
     }
 
-    // 每3秒轮播显示一个股票
+    // 使用配置的间隔时间轮播显示股票
     stockDisplayTimer = setInterval(() => {
         updateTrayDisplay();
         updateFloatingDisplay(); // 同时更新悬浮窗口
-    }, 3000);
+    }, stockDisplayInterval);
 
-    console.log('股票轮播显示已启动，每3秒切换一次');
+    console.log(`股票轮播显示已启动，每${stockDisplayInterval / 1000}秒切换一次`);
 }
 
 // 启动数据刷新定时器
@@ -819,12 +953,12 @@ function startDataRefresh() {
         clearInterval(dataRefreshTimer);
     }
 
-    // 每30秒刷新一次真实数据
+    // 使用配置的间隔时间刷新真实数据
     dataRefreshTimer = setInterval(() => {
         fetchRealStockData();
-    }, 30000);
+    }, dataRefreshInterval);
 
-    console.log('数据刷新定时器已启动，每30秒刷新一次');
+    console.log(`数据刷新定时器已启动，每${dataRefreshInterval / 1000}秒刷新一次`);
 }
 
 // 停止股票轮播显示
@@ -853,20 +987,50 @@ function setupIpcHandlers() {
     // 处理获取设置请求
     ipcMain.handle('get-settings', async () => {
         return {
-            stockCodes: stockCodes
+            stockCodes: stockCodes,
+            timers: {
+                stockDisplayInterval: stockDisplayInterval,
+                dataRefreshInterval: dataRefreshInterval
+            }
         };
     });
 
     // 处理更新设置请求
     ipcMain.handle('update-settings', async (event, settings) => {
+        let needsRestartTimers = false;
+
         if (settings.stockCodes) {
             stockCodes = settings.stockCodes;
             console.log('股票代码已更新:', stockCodes);
+            needsRestartTimers = true;
+        }
+
+        if (settings.timers) {
+            if (settings.timers.stockDisplayInterval && settings.timers.stockDisplayInterval !== stockDisplayInterval) {
+                stockDisplayInterval = settings.timers.stockDisplayInterval;
+                console.log('股票显示轮播间隔已更新:', stockDisplayInterval, '毫秒');
+                needsRestartTimers = true;
+            }
+
+            if (settings.timers.dataRefreshInterval && settings.timers.dataRefreshInterval !== dataRefreshInterval) {
+                dataRefreshInterval = settings.timers.dataRefreshInterval;
+                console.log('数据刷新间隔已更新:', dataRefreshInterval, '毫秒');
+                needsRestartTimers = true;
+            }
+        }
+
+        if (needsRestartTimers) {
             // 保存到配置文件
             saveStockCodes();
+
+            // 重启定时器以应用新配置
+            startStockRotation();
+            startDataRefresh();
+
             // 更新设置后立即获取新数据
             fetchRealStockData();
         }
+
         return { success: true };
     });
 
@@ -962,6 +1126,20 @@ function checkAndRestoreWindows() {
     }
 }
 
+// 设置 Electron 启动参数，减少缓存错误
+if (process.platform === 'win32') {
+    // Windows 平台特定设置
+    process.argv.push('--disable-gpu-cache');
+    process.argv.push('--disable-software-rasterizer');
+    process.argv.push('--disable-gpu-sandbox');
+    process.argv.push('--no-sandbox');
+    process.argv.push('--disable-dev-shm-usage');
+    process.argv.push('--disable-web-security');
+    process.argv.push('--allow-running-insecure-content');
+
+    console.log('🔧 Windows 平台启动参数已设置');
+}
+
 // 全局错误处理
 process.on('uncaughtException', (error) => {
     console.error('未捕获的异常:', error);
@@ -978,6 +1156,35 @@ process.on('unhandledRejection', (reason, promise) => {
 // 应用事件处理
 app.whenReady().then(() => {
     console.log('应用已准备就绪，开始初始化...');
+
+    // 设置缓存目录到执行目录，避免权限问题
+    try {
+        const cachePath = path.join(__dirname, 'cache');
+        const userDataPath = path.join(__dirname, 'userData');
+
+        // 设置应用缓存目录
+        app.setPath('userData', userDataPath);
+        app.setPath('temp', path.join(__dirname, 'temp'));
+        app.setPath('logs', path.join(__dirname, 'logs'));
+
+        console.log('✅ 缓存目录已设置到执行目录:');
+        console.log('   - 用户数据目录:', userDataPath);
+        console.log('   - 临时目录:', path.join(__dirname, 'temp'));
+        console.log('   - 日志目录:', path.join(__dirname, 'logs'));
+
+        // 确保目录存在
+        [cachePath, userDataPath, path.join(__dirname, 'temp'), path.join(__dirname, 'logs')].forEach(dir => {
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+                console.log('📁 创建目录:', dir);
+            }
+        });
+    } catch (error) {
+        console.warn('⚠️ 设置缓存目录失败，使用默认路径:', error.message);
+    }
+
+    // 验证必需的资源文件
+    validateResourceFiles();
 
     // 首先加载股票代码配置
     loadStockCodes();

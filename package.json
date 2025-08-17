@@ -28,7 +28,12 @@
             "**/*",
             "!node_modules/**/*",
             "!dist/**/*",
-            "!*.md"
+            "!*.md",
+            "!stock-codes.json",
+            "!stock-names-config.json",
+            "!*.bat",
+            "!*.ps1",
+            "!*.sh"
         ],
         "win": {
             "target": "nsis",
@@ -41,7 +46,13 @@
             "createStartMenuShortcut": true
         }
     },
-    "keywords": ["stock", "ticker", "widget", "taskbar", "electron"],
+    "keywords": [
+        "stock",
+        "ticker",
+        "widget",
+        "taskbar",
+        "electron"
+    ],
     "author": "Your Name",
     "license": "MIT"
 }

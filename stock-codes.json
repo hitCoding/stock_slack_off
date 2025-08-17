@@ -1,7 +1,12 @@
 {
   "stockCodes": [
     "300059",
-    "00981"
+    "00981",
+    "002241"
   ],
-  "lastUpdated": "2025-08-17T09:16:31.678Z"
+  "lastUpdated": "2025-08-17T11:59:25.169Z",
+  "timers": {
+    "stockDisplayInterval": 1000,
+    "dataRefreshInterval": 5000
+  }
 }

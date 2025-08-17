@@ -1,10 +1,10 @@
 // 股票行情小工具配置文件
 module.exports = {
     // 股票轮播显示间隔（毫秒）
-    stockRotationInterval: 5000, // 5秒
+    stockRotationInterval: 1000, // 5秒
 
     // 股票数据刷新间隔（毫秒）
-    stockDataRefreshInterval: 30000, // 30秒
+    stockDataRefreshInterval: 5000, // 30秒
 
     // 默认股票代码
     defaultStockCodes: ['000001', '600000', '000858'],
